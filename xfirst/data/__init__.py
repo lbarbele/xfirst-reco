@@ -1,9 +1,34 @@
+import os
 import pathlib
 from typing import List
 
+import numpy as np
+
 from . import conex
 
-from ..util import get_file_list, json_dump
+from ..util import get_file_list, json_dump, json_load, npz_save
+
+def make_profile_datasets(
+  data: str,
+  out: str,
+  max_train: int = None,
+  max_val: int = None,
+  max_test: int = None,
+  verbose: bool = True,
+):
+  dataset_paths = json_load(data)
+  nshowers = {'train': max_train, 'validation': max_val, 'test': max_test}
+
+  for dsname, ds in dataset_paths.items():
+    if verbose: print(f'parsing {dsname} dataset')
+
+    for prm, files in ds.items():
+      parser = conex.parser(files = files, branches = ['Edep'], nshowers = nshowers[dsname], concat = True)
+      data = parser.get_table('np')
+      file = pathlib.Path(f'{out}/{dsname}/{prm}.npz').resolve()
+      npz_save(file, **{prm: data})
+
+      if verbose: print(f'+ {prm} data saved to {file}')
 
 def split_conex_files(
   ds,

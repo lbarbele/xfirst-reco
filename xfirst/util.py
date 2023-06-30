@@ -4,6 +4,8 @@ import os
 import pathlib
 from typing import List, Union
 
+import numpy as np
+
 def json_dump(data, path: str):
   p = pathlib.Path(path).resolve()
   os.makedirs(p.parent, exist_ok = True)
@@ -39,3 +41,13 @@ def json_load(path: str):
     data = json.load(f)
 
   return data
+
+def npz_load(path):
+  with np.load(path) as data:
+    ret = dict(data)
+  return ret
+
+def npz_save(path, **kwargs):
+  p = pathlib.Path(path).resolve()
+  os.makedirs(p.parent, exist_ok = True)
+  np.savez_compressed(p, **kwargs)
