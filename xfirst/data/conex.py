@@ -127,7 +127,8 @@ class parser:
       case 'pd':
         idx = pd.Index(range(self.nshowers), name = 'id')
         return pd.DataFrame(data, columns = self.columns, copy = False, index = idx)
-      case _: raise RuntimeError(f'parser.get_table: invalid format {format}')
+      case _:
+        raise RuntimeError(f'parser.get_table: invalid format {format}')
       
   def read(self, entry: int) -> None:
 
