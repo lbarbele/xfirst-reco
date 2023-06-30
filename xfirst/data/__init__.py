@@ -29,6 +29,9 @@ def make_profile_datasets(
       npz_save(file, **{prm: data})
 
       if verbose: print(f'+ {prm} data saved to {file}')
+  
+  depths = conex.parser(files = dataset_paths[dsname][prm], branches = ['Xdep'], nshowers = 1, concat = True)[0]
+  npz_save(f'{out}/depths.npz', depths = depths)
 
 def make_xfirst_datasets(
   data: str,
