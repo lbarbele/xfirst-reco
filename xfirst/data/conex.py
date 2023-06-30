@@ -96,7 +96,7 @@ class parser:
 
     value = np.zeros(npt, dtype = typedict[tp])
     self.data[branch_name] = value
-    branch.SetAddress(value)
+    self.tree.SetBranchAddress(branch_name, value)
 
     return value
   
