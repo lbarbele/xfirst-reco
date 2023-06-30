@@ -154,14 +154,13 @@ class profile_function(abc.ABC):
       x, y = next(iter)
       data[i] = self.fit(x, y, concat = True)
 
-    match format:
-      case 'np':
-        return data
-      case 'pd':
-        idx = pd.Index(range(size), name = 'id')
-        return pd.DataFrame(data, columns = self.columns, copy = False, index = idx)
-      case _:
-        raise RuntimeError(f'parser.get_table: invalid format {format}')
+    if format == 'np':
+      return data
+    elif format == 'pd':
+      idx = pd.Index(range(size), name = 'id')
+      return pd.DataFrame(data, columns = self.columns, copy = False, index = idx)
+    else:
+      raise RuntimeError(f'parser.get_table: invalid format {format}')
 
 # *
 # * implementations

@@ -102,16 +102,15 @@ class parser:
   
   def add_special_branch(self, branch_name: str) -> None:
 
-    match branch_name:
-      case 'Xdep':
-        x = self.add_branch('X')
-        self.read(0)
-        self.data[branch_name] = 0.5*(x[1:]+x[:-1])
-      case 'Edep':
-        y =  self.add_branch('dEdX')
-        self.data[branch_name] = y[:-1]
-      case _:
-        raise RuntimeError(f'parser.add_special_branch: invalid branch {branch_name}')
+    if branch_name == 'Xdep':
+      x = self.add_branch('X')
+      self.read(0)
+      self.data[branch_name] = 0.5*(x[1:]+x[:-1])
+    elif branch_name == 'Edep':
+      y =  self.add_branch('dEdX')
+      self.data[branch_name] = y[:-1]
+    else:
+      raise RuntimeError(f'parser.add_special_branch: invalid branch {branch_name}')
       
   def get_table(self, format: Literal['np', 'pd'] = 'np') -> Union[np.ndarray, pd.DataFrame]:
     
@@ -121,14 +120,13 @@ class parser:
       self.read(i)
       np.concatenate(self._row_data, out = data[i])
 
-    match format:
-      case 'np':
-        return data
-      case 'pd':
-        idx = pd.Index(range(self.nshowers), name = 'id')
-        return pd.DataFrame(data, columns = self.columns, copy = False, index = idx)
-      case _:
-        raise RuntimeError(f'parser.get_table: invalid format {format}')
+    if format == 'np':
+      return data
+    elif format == 'pd':
+      idx = pd.Index(range(self.nshowers), name = 'id')
+      return pd.DataFrame(data, columns = self.columns, copy = False, index = idx)
+    else:
+      raise RuntimeError(f'parser.get_table: invalid format {format}')
       
   def read(self, entry: int) -> None:
 
