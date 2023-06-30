@@ -1,6 +1,5 @@
 import abc
 import inspect
-from typing import Literal
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -146,7 +145,7 @@ class profile_function(abc.ABC):
   def fit_callback(self):
     pass
       
-  def get_fits(self, iter, size: int, format: Literal['np', 'pd'] = 'np'):
+  def get_fits(self, iter, size: int, format: str = 'np'):
 
     data = np.zeros(shape = (size, 2*self.npar + 3), dtype = np.float32)
 

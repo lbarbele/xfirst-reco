@@ -1,4 +1,4 @@
-from typing import List, Literal, Union
+from typing import List, Union
 
 import numpy as np
 import pandas as pd
@@ -112,7 +112,7 @@ class parser:
     else:
       raise RuntimeError(f'parser.add_special_branch: invalid branch {branch_name}')
       
-  def get_table(self, format: Literal['np', 'pd'] = 'np') -> Union[np.ndarray, pd.DataFrame]:
+  def get_table(self, format: str = 'np') -> Union[np.ndarray, pd.DataFrame]:
     
     data = np.zeros(shape = (self.nshowers, len(self.columns)), dtype = np.float32)
     
