@@ -1,6 +1,14 @@
 import glob
+import json
+import os
 import pathlib
 from typing import List, Union
+
+def json_dump(data, path: str):
+  p = pathlib.Path(path).resolve()
+  os.makedirs(p.parent, exist_ok = True)
+  with open(p, 'w') as f:
+    f.write(json.dumps(data, indent = 2))
 
 def get_file_list(
   globs: Union[str, List[str], tuple],
@@ -25,3 +33,9 @@ def get_file_list(
     return files
   else:
     raise RuntimeError(f'get_file_list: bad input "{globs}"')
+  
+def json_load(path: str):
+  with open(path, 'r') as f:
+    data = json.load(f)
+
+  return data
