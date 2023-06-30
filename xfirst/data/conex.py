@@ -147,9 +147,10 @@ class parser:
     return self
   
   def __next__(self) -> Union[List[np.ndarray], np.ndarray]:
+    if self.current >= self.nshowers: raise StopIteration
+    data = self.__getitem__(self.current)
     self._current += 1
-    if self.current > self.nshowers: raise StopIteration
-    return self.__getitem__(self.current)
+    return data
   
   # properties
 
