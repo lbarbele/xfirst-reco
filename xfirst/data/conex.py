@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import ROOT
 
-from ..util import get_file_list
+from ..util import get_file_list as _get_file_list
 
 def get_conex_tree(
   files: Union[str, List[str]],
@@ -17,7 +17,7 @@ def get_conex_tree(
 
   chain = ROOT.TChain(tree_name, tree_name)
 
-  for file in get_file_list(files):
+  for file in _get_file_list(files):
     chain.Add(file)
 
     if max_entries is not None and chain.GetEntries() >= max_entries:
