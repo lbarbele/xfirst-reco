@@ -57,7 +57,7 @@ class parser:
     # form a row of data
     row = [self.data[br] for br in branches]
     self._row_data = row
-    self._row = np.concatenate(row, dtype = np.float32) if concat else row
+    self._row = np.concatenate(row).astype(np.float32) if concat else row
 
     # generate column names
     self._columns = []
