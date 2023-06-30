@@ -1,0 +1,32 @@
+#!/bin/bash
+#SBATCH      --job-name makeds
+#SBATCH         --nodes 1
+#SBATCH --cpus-per-task 48
+#SBATCH     --partition sequana_cpu_dev
+#SBATCH          --time 00:20:00
+#SBATCH     --mail-type ALL
+#SBATCH     --mail-user luan.arbeletche@gmail.com
+#SBATCH        --output /dev/null #? do not change
+#SBATCH         --error /dev/null #? do not change
+#SBATCH     --exclusive           #? do not change
+
+source /scratch/astroparti/luan.arbeletche/ml-conex-xfirst/sd-scripts/prepare_env.sh
+
+echo '--> calling make_profile_datasets.py'
+
+python "${SCRIPTS_DIR}/make_profile_datasets.py" \
+  --data "${CONEX_JSON}" \
+  --out "${PROFILES_DATA_DIR}" \
+  --max-train "${MAX_TRAIN}" \
+  --max-val "${MAX_VAL}" \
+  --max-test "${MAX_TEST}"
+
+echo ''
+echo '--> calling make_xfirst_datasets.py'
+
+python "${SCRIPTS_DIR}/make_xfirst_datasets.py" \
+  --data "${CONEX_JSON}" \
+  --out "${XFIRST_DATA_DIR}" \
+  --max-train "${MAX_TRAIN}" \
+  --max-val "${MAX_VAL}" \
+  --max-test "${MAX_TEST}"
