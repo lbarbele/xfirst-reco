@@ -30,6 +30,30 @@ def make_profile_datasets(
 
       if verbose: print(f'+ {prm} data saved to {file}')
 
+def make_xfirst_datasets(
+  data: str,
+  out: str,
+  max_train: int = None,
+  max_val: int = None,
+  max_test: int = None,
+  verbose: bool = True,
+):
+  branches = ['Xfirst', 'lgE', 'Nmx', 'Xmx']
+  dataset_paths = json_load(data)
+  nshowers = {'train': max_train, 'validation': max_val, 'test': max_test}
+
+  for dsname, ds in dataset_paths.items():
+    if verbose: print(f'parsing {dsname} dataset')
+
+    for prm, files in ds.items():
+      parser = conex.parser(files = files, branches = branches, nshowers = nshowers[dsname], concat = True)
+      data = parser.get_table('pd')
+      file = pathlib.Path(f'{out}/{dsname}/{prm}.parquet').resolve()
+      os.makedirs(file.parent, exist_ok = True)
+      data.to_parquet(file)
+
+      if verbose: print(f'+ {prm} data saved to {file}')
+
 def split_conex_files(
   ds,
   datadir: str,
