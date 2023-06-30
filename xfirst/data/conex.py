@@ -64,7 +64,7 @@ class parser:
     for i, v in enumerate(row):
       l = len(v)
       b = branches[i]
-      self._columns += [f'{b}_{j}' for j in range(l)]
+      self._columns += [b] if (l == 1) else [f'{b}_{j}' for j in range(l)]
 
   # methods
 
