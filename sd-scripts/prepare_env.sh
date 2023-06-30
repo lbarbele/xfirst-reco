@@ -39,9 +39,9 @@ export CONEX_JSON="${DATA_DIR}/conex.json"
 
 # number of showers to use
 
-export MAX_TRAIN=1000
-export MAX_VAL=1000
-export MAX_TEST=400
+export MAX_TRAIN=1800000
+export MAX_VAL=1800000
+export MAX_TEST=40000
 
 # rename job
 
