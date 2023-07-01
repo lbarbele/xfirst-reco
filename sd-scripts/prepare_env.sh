@@ -42,7 +42,7 @@ export CONEX_JSON="${DATA_DIR}/conex.json"
 
 export MAX_TRAIN=1800000
 export MAX_VAL=1800000
-export MAX_TEST=40000
+export MAX_TEST=400000
 
 # rename job
 
