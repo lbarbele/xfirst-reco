@@ -46,7 +46,7 @@ def load_profiles(
 
   # append depth to the return value
   if return_depths:
-    ret.append(depths)
+    ret.append(np.copy(depths[il:ir]))
 
   return ret if len(ret) > 1 else ret[0]
 
