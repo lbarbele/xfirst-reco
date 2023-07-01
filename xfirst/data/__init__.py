@@ -1,12 +1,54 @@
+import collections
 import os
 import pathlib
-from typing import List
+import typing
 
 import numpy as np
+import pandas as pd
+
+from .. import util
 
 from . import conex
 
-from ..util import get_file_list, json_dump, json_load, npz_save
+def load_profiles(
+  datadir: str,
+  datasets: typing.Union[str, typing.List[str]] = ['train', 'validation', 'test'],
+  particles: typing.Union[str, typing.List[str]] = ['p', 'He', 'C', 'Si', 'Fe'],
+  nshowers: dict = None,
+  min_depth: float = None,
+  max_depth: float = None,
+  return_depths: bool = False,
+  format: str = 'np',
+) -> typing.Union[dict, pd.DataFrame]:
+  
+  particles = util.as_list(particles)
+  nshw = collections.defaultdict(lambda: None, {} if nshowers is None else nshowers)
+
+  # read depths and determine depth cuts
+  depths = util.npz_load(f'{datadir}/depths.npz')['depths']
+  il, ir = util.get_range(depths, min_depth, max_depth)
+  columns = [f'Edep_{i}' for i in range(len(depths))][il:ir]
+
+  ret = []
+  for dsname in util.as_list(datasets):
+    # read data
+    data = {prm: util.npz_load(f'{datadir}/{dsname}/{prm}.npz')[prm] for prm in particles}
+    # apply cuts
+    if nshw[dsname] is not None or il is not None or ir is not None:
+      data = {prm: np.copy(v[:nshw[dsname], il:ir]) for prm, v in data.items()}
+    # format data
+    if format == 'np':
+      ret.append(data)
+    elif format == 'pd':
+      ret.append(util.df_from_dict(data, particles, columns))
+    else:
+      raise RuntimeError(f'load_profiles: unsupported format {format}')
+
+  # append depth to the return value
+  if return_depths:
+    ret.append(depths)
+
+  return ret if len(ret) > 1 else ret[0]
 
 def make_profile_datasets(
   data: str,
@@ -16,7 +58,7 @@ def make_profile_datasets(
   max_test: int = None,
   verbose: bool = True,
 ):
-  dataset_paths = json_load(data)
+  dataset_paths = util.json_load(data)
   nshowers = {'train': max_train, 'validation': max_val, 'test': max_test}
 
   for dsname, ds in dataset_paths.items():
@@ -26,12 +68,12 @@ def make_profile_datasets(
       parser = conex.parser(files = files, branches = ['Edep'], nshowers = nshowers[dsname], concat = True)
       data = parser.get_table('np')
       file = pathlib.Path(f'{out}/{dsname}/{prm}.npz').resolve()
-      npz_save(file, **{prm: data})
+      util.npz_save(file, **{prm: data})
 
       if verbose: print(f'+ {prm} data saved to {file}')
   
   depths = conex.parser(files = dataset_paths[dsname][prm], branches = ['Xdep'], nshowers = 1, concat = True)[0]
-  npz_save(f'{out}/depths.npz', depths = depths)
+  util.npz_save(f'{out}/depths.npz', depths = depths)
 
 def make_xfirst_datasets(
   data: str,
@@ -42,7 +84,7 @@ def make_xfirst_datasets(
   verbose: bool = True,
 ):
   branches = ['Xfirst', 'lgE', 'Nmx', 'Xmx']
-  dataset_paths = json_load(data)
+  dataset_paths = util.json_load(data)
   nshowers = {'train': max_train, 'validation': max_val, 'test': max_test}
 
   for dsname, ds in dataset_paths.items():
@@ -61,7 +103,7 @@ def split_conex_files(
   ds,
   datadir: str,
   verbose: bool = False,
-  particles: List[str] = ['p', 'He', 'C', 'Si', 'Fe'],
+  particles: typing.List[str] = ['p', 'He', 'C', 'Si', 'Fe'],
   out: str = None,
 ) -> dict:
   
@@ -69,7 +111,7 @@ def split_conex_files(
 
   sizes = ds if isinstance(ds, dict) else dict(ds)
   globs = {p: f'{datadir}/{p}*/*/*.root' for p in particles}
-  paths = {p: get_file_list(g) for p, g in globs.items()}
+  paths = {p: util.get_file_list(g) for p, g in globs.items()}
 
   # check if there are enought files to generate the datasets
 
@@ -120,6 +162,6 @@ def split_conex_files(
   # save output file
 
   if out is not None:
-    json_dump(datasets, out)
+    util.json_dump(datasets, out)
     
   return datasets
