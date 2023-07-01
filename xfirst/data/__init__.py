@@ -38,7 +38,7 @@ def load_profiles(
       data = {prm: np.copy(v[:nshw[dsname], il:ir]) for prm, v in data.items()}
     # format data
     if format == 'np':
-      ret.append(data)
+      ret.append(data if len(particles) > 1 else data[particles[0]])
     elif format == 'pd':
       ret.append(util.df_from_dict(data, particles, columns))
     else:
