@@ -89,9 +89,9 @@ def make_fits(
       split_at += (np.arange(workers - 1) < profiles.shape[0]%workers)
       split_at = split_at.cumsum()
 
-      fs = itertools.repeat(fcn(), workers)
-      xs = itertools.repeat(itertools.repeat(depths), workers)
       ys = np.split(profiles, split_at)
+      fs = [fcn() for _ in ys]
+      xs = [itertools.repeat(depths, len(y)) for y in ys]
 
       with concurrent.futures.ProcessPoolExecutor(workers) as exec:
         fits = exec.map(fcn.get_fits, fs, xs, ys)
