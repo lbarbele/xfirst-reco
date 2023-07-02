@@ -56,6 +56,35 @@ redirect_std
 
 # environment
 
-module load deepl/deeplearn-py3.7
-export PYTHONPATH="${BASE_DIR}:${PYTHONPATH}:${HOME_DIR}/programas/python-packages"
-source "${HOME_DIR}/programas/root-6.28.02-python3.7/bin/thisroot.sh"
+# load modules
+module load cmake/3.17.3
+module load binutils/2.32
+module load cudnn/8.2_cuda-11.4
+module load gcc/11.1
+
+# python version
+export PYTHON_VERSION=3.11.3
+export PYTHON_MAJOR=3
+
+# python directories
+export PYTHON_TARGET=${SCRATCH}/programas/Python-${PYTHON_VERSION}
+export PYTHON_SRC=${PYTHON_TARGET}-src
+export PYTHON_PACKAGES=${PYTHON_TARGET}-packages
+export PYTHON_DEP=${PYTHON_TARGET}-dep
+
+# openssl
+export OPENSSL_TARGET=${PYTHON_DEP}/openssl-3.1.1
+export PATH=${OPENSSL_TARGET}/bin:${PATH}
+export LD_LIBRARY_PATH=${OPENSSL_TARGET}/lib64:${LD_LIBRARY_PATH}
+
+# root
+source /scratch/astroparti/luan.arbeletche/programas/root-6.28.02-python3.11.3/bin/thisroot.sh
+
+# update paths
+export PATH=${PYTHON_TARGET}/bin:${PATH}
+export LD_LIBRARY_PATH=${PYTHON_TARGET}/lib:${LD_LIBRARY_PATH}
+export PYTHONPATH="${BASE_DIR}:${PYTHON_PACKAGES}:${PYTHONPATH}"
+
+# aliases
+alias python=python3
+alias pip=pip3
