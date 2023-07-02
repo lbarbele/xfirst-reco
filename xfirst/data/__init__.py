@@ -85,8 +85,9 @@ def make_fits(
     for prm in particles:
       profiles, depths = load_profiles(datasets = dsname, particles = prm, **load_args)
 
-      batch_size = profiles.shape[0]//workers + int(profiles.shape[0]%workers > 0)
-      split_at = np.arange(1, workers)*batch_size
+      split_at = np.repeat(profiles.shape[0]//workers, workers - 1)
+      split_at += (np.arange(workers - 1) < profiles.shape[0]%workers)
+      split_at = split_at.cumsum()
 
       fs = itertools.repeat(fcn(), workers)
       xs = itertools.repeat(itertools.repeat(depths), workers)
