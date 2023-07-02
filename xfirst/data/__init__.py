@@ -88,12 +88,12 @@ def make_fits(
       batch_size = profiles.shape[0]//workers + int(profiles.shape[0]%workers > 0)
       split_at = np.arange(1, workers)*batch_size
 
-      data_slices = np.split(profiles, split_at)
-      n_list = [len(y) for y in data_slices]
-      z_list = [zip(itertools.repeat(depths, len(y)), y) for y in data_slices]
+      fs = itertools.repeat(fcn(), workers)
+      xs = itertools.repeat(itertools.repeat(depths), workers)
+      ys = np.split(profiles, split_at)
 
       with concurrent.futures.ProcessPoolExecutor(workers) as exec:
-        fits = exec.map(fcn.get_fits, itertools.repeat(fcn(), workers), z_list, n_list, itertools.repeat('np', workers))
+        fits = exec.map(fcn.get_fits, fs, xs, ys)
         fits = np.concatenate(list(fits))
         fits = pd.DataFrame(fits, columns = fcn().columns, index = pd.Index(range(len(fits)), name = 'id'))
 

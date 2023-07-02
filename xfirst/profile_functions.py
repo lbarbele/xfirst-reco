@@ -145,19 +145,16 @@ class profile_function(abc.ABC):
   def fit_callback(self):
     pass
       
-  def get_fits(self, iter, size: int, format: str = 'np'):
+  def get_fits(self, x, y = None, format: str = 'np'):
 
-    data = np.zeros(shape = (size, 2*self.npar + 3), dtype = np.float32)
-
-    for i in range(size):
-      x, y = next(iter)
-      data[i] = self.fit(x, y, concat = True)
+    iter = x if y is None else zip(x, y)
+    data = [self.fit(xi, yi, concat = True) for xi, yi in iter]
 
     if format == 'np':
-      return data
+      return np.array(data, dtype = np.float32)
     elif format == 'pd':
-      idx = pd.Index(range(size), name = 'id')
-      return pd.DataFrame(data, columns = self.columns, copy = False, index = idx)
+      idx = pd.Index(range(len(data)), name = 'id')
+      return pd.DataFrame(data, columns = self.columns, index = idx)
     else:
       raise RuntimeError(f'parser.get_table: invalid format {format}')
 
