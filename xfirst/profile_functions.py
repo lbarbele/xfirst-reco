@@ -119,15 +119,19 @@ class profile_function(abc.ABC):
     # number of degrees of freedom
     self._ndf = len(x) - self.npar
 
+    # scipy requires float64 for x and y and p0
+    xf = x if x.dtype >= np.float64 else np.array(x, dtype = np.float64)
+    yf = y if y.dtype >= np.float64 else np.array(y, dtype = np.float64)
+
     try:
       # poissonian ansatz as in https://arxiv.org/abs/1111.0504, but without cutting the profiles
-      s = 1e-2*np.sqrt(y*np.sum(y))
-      p0 = self.guess(x, y)
-      popt, pcov, info, mesg, ierr = curve_fit(self, x, y, p0, s, full_output = True)
+      s = 1e-2*np.sqrt(yf*np.sum(yf))
+      p0 = self.guess(xf, yf)
+      popt, pcov, info, mesg, ierr = curve_fit(self, xf, yf, p0, s, full_output = True)
       self._params = popt
       self._fit_status = (1 <= ierr and ierr <= 4)
       self._errors = np.sqrt(pcov.diagonal()) if self._fit_status else np.zeros(self.npar, dtype = np.float32)
-      self._chi2 = np.sum(((y - self(x, *popt)) / s)**2)
+      self._chi2 = np.sum(((yf - self(xf, *popt)) / s)**2)
       self._fitted_data = (x, y)
 
       self.fit_callback()
@@ -177,7 +181,7 @@ class usp(profile_function, function_name = 'usp'):
     self._params[3] = np.abs(self._params[3])
   
   def guess(self, x, y):
-    return np.array([np.log(np.max(y)), x[np.argmax(y)], 200, 0.25], dtype = np.float32)
+    return np.array([np.log(np.max(y)), x[np.argmax(y)], 200, 0.25], dtype = np.float64)
   
 class gaisser_hillas(profile_function, function_name = 'gaisser-hillas'):
   """
@@ -189,4 +193,4 @@ class gaisser_hillas(profile_function, function_name = 'gaisser-hillas'):
     return np.exp(logNmax -xx + yy*(1 + np.log(xx/yy)))
   
   def guess(self, x, y):
-    return np.array([np.log(np.max(y)), x[y.argmax()], -100, 80], dtype = np.float32)
+    return np.array([np.log(np.max(y)), x[y.argmax()], -100, 80], dtype = np.float64)
