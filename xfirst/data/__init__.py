@@ -8,6 +8,7 @@ import typing
 import numpy as np
 import pandas as pd
 
+from .. import config
 from .. import util
 from ..profile_functions import usp
 
@@ -15,8 +16,8 @@ from . import conex
 
 def load_fits(
   datadir: str,
-  datasets: typing.Union[str, typing.List[str]] = ['train', 'validation', 'test'],
-  particles: typing.Union[str, typing.List[str]] = ['p', 'He', 'C', 'Si', 'Fe'],
+  datasets: typing.Union[str, typing.List[str]] = config.datasets,
+  particles: typing.Union[str, typing.List[str]] = config.particles,
   nshowers: dict = None,
 ) -> pd.DataFrame:
   
@@ -34,8 +35,8 @@ def load_fits(
 
 def load_profiles(
   datadir: str,
-  datasets: typing.Union[str, typing.List[str]] = ['train', 'validation', 'test'],
-  particles: typing.Union[str, typing.List[str]] = ['p', 'He', 'C', 'Si', 'Fe'],
+  datasets: typing.Union[str, typing.List[str]] = config.datasets,
+  particles: typing.Union[str, typing.List[str]] = config.particles,
   nshowers: dict = None,
   min_depth: float = None,
   max_depth: float = None,
@@ -74,8 +75,8 @@ def load_profiles(
 
 def load_xfirst(
   datadir: str,
-  datasets: typing.Union[str, typing.List[str]] = ['train', 'validation', 'test'],
-  particles: typing.Union[str, typing.List[str]] = ['p', 'He', 'C', 'Si', 'Fe'],
+  datasets: typing.Union[str, typing.List[str]] = config.datasets,
+  particles: typing.Union[str, typing.List[str]] = config.particles,
   nshowers: dict = None,
 ) -> pd.DataFrame:
   
@@ -93,8 +94,6 @@ def make_fits(
   verbose: bool = True,
 ):
   
-  datasets = ['train', 'validation', 'test']
-  particles = ['p', 'He', 'C', 'Si', 'Fe']
   workers = os.cpu_count() if workers is None else workers
   fcn = usp # class, not instance
 
@@ -107,10 +106,10 @@ def make_fits(
     'format': 'np',
   }
 
-  for dsname in datasets:
+  for dsname in config.datasets:
     if verbose: print(f'parsing {dsname} dataset')
 
-    for prm in particles:
+    for prm in config.particles:
       profiles, depths = load_profiles(datasets = dsname, particles = prm, **load_args)
 
       split_at = np.repeat(profiles.shape[0]//workers, workers - 1)
@@ -184,7 +183,7 @@ def split_conex_files(
   ds,
   datadir: str,
   verbose: bool = False,
-  particles: typing.List[str] = ['p', 'He', 'C', 'Si', 'Fe'],
+  particles: typing.List[str] = config.particles,
   out: str = None,
 ) -> dict:
   
