@@ -3,7 +3,6 @@ import concurrent.futures
 import itertools
 import os
 import pathlib
-import typing
 
 import numpy as np
 import pandas as pd
@@ -16,9 +15,9 @@ from . import conex
 
 def load_fits(
   datadir: str,
-  datasets: typing.Union[str, typing.List[str]] = config.datasets,
-  particles: typing.Union[str, typing.List[str]] = config.particles,
-  nshowers: dict = None,
+  datasets: str | list[str] = config.datasets,
+  particles: str | list[str] = config.particles,
+  nshowers: dict[str, int] | None = None,
 ) -> pd.DataFrame:
   
   particles = util.as_list(particles)
@@ -35,14 +34,14 @@ def load_fits(
 
 def load_profiles(
   datadir: str,
-  datasets: typing.Union[str, typing.List[str]] = config.datasets,
-  particles: typing.Union[str, typing.List[str]] = config.particles,
-  nshowers: dict = None,
-  min_depth: float = None,
-  max_depth: float = None,
+  datasets: str | list[str] = config.datasets,
+  particles: str | list[str] = config.particles,
+  nshowers: dict[str, int] | None = None,
+  min_depth: float | None = None,
+  max_depth: float | None = None,
   return_depths: bool = False,
   format: str = 'np',
-) -> typing.Union[dict, pd.DataFrame]:
+) -> dict[str, np.ndarray] | pd.DataFrame:
   
   particles = util.as_list(particles)
   nshw = collections.defaultdict(lambda: None, {} if nshowers is None else nshowers)
@@ -75,9 +74,9 @@ def load_profiles(
 
 def load_xfirst(
   datadir: str,
-  datasets: typing.Union[str, typing.List[str]] = config.datasets,
-  particles: typing.Union[str, typing.List[str]] = config.particles,
-  nshowers: dict = None,
+  datasets: str | list[str] = config.datasets,
+  particles: str | list[str] = config.particles,
+  nshowers: dict[str, int] | None = None,
 ) -> pd.DataFrame:
   
   return load_fits(datadir, datasets, particles, nshowers)
@@ -85,14 +84,14 @@ def load_xfirst(
 def make_fits(
   datadir: str,
   out: str,
-  max_train: int = None,
-  max_val: int = None,
-  max_test: int = None,
-  min_depth: float = None,
-  max_depth: float = None,
-  workers: int = None,
+  max_train: int | None = None,
+  max_val: int | None = None,
+  max_test: int | None = None,
+  min_depth: float | None = None,
+  max_depth: float | None = None,
+  workers: int | None = None,
   verbose: bool = True,
-):
+) -> None:
   
   workers = os.cpu_count() if workers is None else workers
   fcn = usp # class, not instance
@@ -133,11 +132,12 @@ def make_fits(
 def make_profile_datasets(
   data: str,
   out: str,
-  max_train: int = None,
-  max_val: int = None,
-  max_test: int = None,
+  max_train: int | None = None,
+  max_val: int | None = None,
+  max_test: int | None = None,
   verbose: bool = True,
-):
+) -> None:
+  
   dataset_paths = util.json_load(data)
   nshowers = {'train': max_train, 'validation': max_val, 'test': max_test}
 
@@ -158,11 +158,12 @@ def make_profile_datasets(
 def make_xfirst_datasets(
   data: str,
   out: str,
-  max_train: int = None,
-  max_val: int = None,
-  max_test: int = None,
+  max_train: int | None = None,
+  max_val: int | None = None,
+  max_test: int | None = None,
   verbose: bool = True,
-):
+) -> None:
+  
   branches = ['Xfirst', 'lgE', 'Nmx', 'Xmx']
   dataset_paths = util.json_load(data)
   nshowers = {'train': max_train, 'validation': max_val, 'test': max_test}
@@ -183,9 +184,9 @@ def split_conex_files(
   ds,
   datadir: str,
   verbose: bool = False,
-  particles: typing.List[str] = config.particles,
-  out: str = None,
-) -> dict:
+  particles: str | list[str] = config.particles,
+  out: str | None = None,
+) -> dict[str, dict[str, list[str]]]:
   
   datadir = pathlib.Path(datadir).resolve()
 

@@ -17,7 +17,7 @@ class profile_function(abc.ABC):
   _props = {}
   _impl = {}
 
-  def __init_subclass__(cls, function_name, **kwargs):
+  def __init_subclass__(cls, function_name: str, **kwargs) -> None:
     super().__init_subclass__(**kwargs)
 
     if hasattr(inspect, 'getargspec'):
@@ -41,7 +41,7 @@ class profile_function(abc.ABC):
     pass
 
   @abc.abstractmethod
-  def guess(x, y):
+  def guess(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     pass
 
   # static methods
@@ -114,7 +114,7 @@ class profile_function(abc.ABC):
     
       return axis
 
-  def fit(self, x: np.ndarray, y: np.ndarray, concat: bool = False):
+  def fit(self, x: np.ndarray, y: np.ndarray, concat: bool = False) -> list | np.ndarray:
 
     # number of degrees of freedom
     self._ndf = len(x) - self.npar
@@ -149,7 +149,7 @@ class profile_function(abc.ABC):
   def fit_callback(self):
     pass
       
-  def get_fits(self, x, y = None, format: str = 'np'):
+  def get_fits(self, x, y = None, format: str = 'np') -> np.ndarray | pd.DataFrame:
 
     iter = x if y is None else zip(x, y)
     data = [self.fit(xi, yi, concat = True) for xi, yi in iter]
@@ -172,7 +172,7 @@ class usp(profile_function, function_name = 'usp'):
   of four parameters, but written in a form that the distribution of the shape
   parameters is less correlated and without large tails.
   """
-  def __call__(self, x, lgNmax, Xmax, L, R):
+  def __call__(self, x, lgNmax, Xmax, L, R) -> float | np.ndarray:
     absr = np.abs(R)
     z = np.maximum(1 + (absr/L) * (x - Xmax), 1e-5)
     return np.exp(lgNmax + (1 + np.log(z) - z) / absr**2)
@@ -180,17 +180,17 @@ class usp(profile_function, function_name = 'usp'):
   def fit_callback(self):
     self._params[3] = np.abs(self._params[3])
   
-  def guess(self, x, y):
+  def guess(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
     return np.array([np.log(np.max(y)), x[np.argmax(y)], 200, 0.25], dtype = np.float64)
   
 class gaisser_hillas(profile_function, function_name = 'gaisser-hillas'):
   """
   Usual Gaisser-Hillas profile with four parameters.
   """
-  def __call__(self, x, logNmax, Xmax, X0, Lambda):
+  def __call__(self, x, logNmax, Xmax, X0, Lambda) -> float | np.ndarray:
     xx = np.maximum((x - X0) / Lambda, 1e-5)
     yy = np.maximum((Xmax - X0) / Lambda, 1e-5)
     return np.exp(logNmax -xx + yy*(1 + np.log(xx/yy)))
   
-  def guess(self, x, y):
+  def guess(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
     return np.array([np.log(np.max(y)), x[y.argmax()], -100, 80], dtype = np.float64)

@@ -1,5 +1,3 @@
-from typing import List, Union
-
 import numpy as np
 import pandas as pd
 import ROOT
@@ -7,9 +5,9 @@ import ROOT
 from ..util import get_file_list as _get_file_list
 
 def get_conex_tree(
-  files: Union[str, List[str]],
+  files: str | list[str],
   tree_name: str,
-  max_entries: Union[int, None] = None
+  max_entries: int | None = None
 ) -> ROOT.TChain:
   
   if max_entries is not None and (not isinstance(max_entries, int) or max_entries < 1):
@@ -29,9 +27,9 @@ class parser:
 
   def __init__(
     self,
-    files: Union[str, List[str]],
-    branches: List[str],
-    nshowers: Union[int, None] = None,
+    files: str | list[str],
+    branches: list[str],
+    nshowers: int | None = None,
     concat: bool = False
   ) -> None:
 
@@ -112,7 +110,7 @@ class parser:
     else:
       raise RuntimeError(f'parser.add_special_branch: invalid branch {branch_name}')
       
-  def get_table(self, format: str = 'np') -> Union[np.ndarray, pd.DataFrame]:
+  def get_table(self, format: str = 'np') -> np.ndarray | pd.DataFrame:
     
     data = np.zeros(shape = (self.nshowers, len(self.columns)), dtype = np.float32)
     
@@ -134,7 +132,7 @@ class parser:
 
   # element access and iteration
 
-  def __getitem__(self, pos: int) -> Union[List[np.ndarray], np.ndarray]:
+  def __getitem__(self, pos: int) -> list[np.ndarray] | np.ndarray:
 
     self.read(pos)
     if self.concat: np.concatenate(self._row_data, out = self._row)
@@ -145,7 +143,7 @@ class parser:
     self._current = 0
     return self
   
-  def __next__(self) -> Union[List[np.ndarray], np.ndarray]:
+  def __next__(self) -> list[np.ndarray] | np.ndarray:
     if self.current >= self.nshowers: raise StopIteration
     data = self.__getitem__(self.current)
     self._current += 1

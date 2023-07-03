@@ -2,7 +2,6 @@ import glob
 import json
 import os
 import pathlib
-import typing
 
 import numpy as np
 import pandas as pd
@@ -17,9 +16,9 @@ def as_list(input, check_empty: bool = True) -> list:
   return ret
 
 def df_from_dict(
-  datadict: dict,
-  keys: typing.List[str] = None,
-  columns: typing.List[str] = None,
+  datadict: dict[str, np.ndarray],
+  keys: list[str] | None = None,
+  columns: list[str] | None = None,
   index_name: str = 'id',
 ) -> pd.DataFrame:
   
@@ -36,7 +35,7 @@ def df_from_dict(
   return pd.concat(dfs, keys = keys)
 
 
-def json_dump(data, path: str) -> None:
+def json_dump(data: dict, path: str) -> None:
 
   p = pathlib.Path(path).resolve()
   os.makedirs(p.parent, exist_ok = True)
@@ -44,10 +43,10 @@ def json_dump(data, path: str) -> None:
     f.write(json.dumps(data, indent = 2))
 
 def get_file_list(
-  globs: typing.Union[str, typing.List[str], tuple],
+  globs: str | list[str],
   sort: bool = True,
   absolute: bool = True,
-) -> typing.List[str]:
+) -> list[str]:
   """
   Takes as input a single glob or a list of globs, resolve them and
   returns a list of strings containing all file paths that match the
@@ -67,7 +66,7 @@ def get_file_list(
   else:
     raise RuntimeError(f'get_file_list: bad input "{globs}"')
   
-def get_range(values: np.ndarray, min_value: float = None, max_value: float = None):
+def get_range(values: np.ndarray, min_value: float | None = None, max_value: float | None = None) -> tuple[int | None, int | None]:
 
   if min_value is not None and max_value is not None and min_value >= max_value:
     raise RuntimeError('get_range: min must be smaller than max')
@@ -96,19 +95,20 @@ def json_load(path: str) -> dict:
 
   return data
 
-def npz_load(path) -> dict:
+def npz_load(path: str) -> dict[np.ndarray]:
 
   with np.load(path) as data:
     ret = dict(data)
+
   return ret
 
-def npz_save(path, **kwargs) -> None:
+def npz_save(path: str, **kwargs) -> None:
   
   p = pathlib.Path(path).resolve()
   os.makedirs(p.parent, exist_ok = True)
   np.savez_compressed(p, **kwargs)
 
-def parquet_load(path, nrows: int = None) -> pd.DataFrame:
+def parquet_load(path: str, nrows: int | None = None) -> pd.DataFrame:
 
   data = pd.read_parquet(path)
 

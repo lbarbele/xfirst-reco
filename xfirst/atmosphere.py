@@ -15,7 +15,7 @@ class atmosphere(abc.ABC):
     else:
       return max(self.a[4] - self.b[4]*h/self.c[4], 0.)
   
-  def _get_height(self, x):
+  def _get_height(self, x: float) -> float:
 
     if x > self.x[0] or x < self.x[-1]:
       raise RuntimeError(f'atmosphere.get_height: invalid depth {x}')
@@ -27,7 +27,7 @@ class atmosphere(abc.ABC):
     else:
       return self.c[4]*(self.a[4] - x)/self.b[4]
 
-  def get_depth(self, height):
+  def get_depth(self, height: float | np.adarray) -> float | np.ndarray:
 
     hs = height if isinstance(height, np.ndarray) else [height]
     xs = [self._get_depth(h) for h in hs]
@@ -37,7 +37,7 @@ class atmosphere(abc.ABC):
 
     return np.array(xs, dtype = np.float64) if len(xs) > 1 else xs[0]
   
-  def get_height(self, depth):
+  def get_height(self, depth: float | np.adarray) -> float | np.adarray:
     
     xs = depth if isinstance(depth, np.ndarray) else [depth]
     hs = [self._get_height(x) for x in xs]
@@ -48,7 +48,7 @@ class atmosphere(abc.ABC):
     return np.array(hs, dtype = np.float64) if len(hs) > 1 else hs[0]
 
 class us_standard(atmosphere):
-  def __init__(self):
+  def __init__(self) -> None:
     self.h = np.array([0, 4, 10, 40, 100, np.inf], dtype = np.float64)
     self.x = np.array([1036.1009, 631.10088, 271.69999, 3.0394999, 0.00128292, 0], dtype = np.float64)
     self.a = np.array([-186.555305, -94.919, 0.6128, 0.0, 0.01128292], dtype = np.float64)
