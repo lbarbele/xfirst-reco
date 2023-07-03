@@ -13,6 +13,25 @@ from ..profile_functions import usp
 
 from . import conex
 
+def load_fits(
+  datadir: str,
+  datasets: typing.Union[str, typing.List[str]] = ['train', 'validation', 'test'],
+  particles: typing.Union[str, typing.List[str]] = ['p', 'He', 'C', 'Si', 'Fe'],
+  nshowers: dict = None,
+) -> pd.DataFrame:
+  
+  particles = util.as_list(particles)
+  nshw = collections.defaultdict(lambda: None, {} if nshowers is None else nshowers)
+
+  ret = []
+
+  for dsname in util.as_list(datasets):
+    data = [util.parquet_load(f'{datadir}/{dsname}/{prm}.parquet', nshw[dsname]) for prm in particles]
+    data = pd.concat(data, keys = particles)
+    ret.append(data)
+
+  return ret if len(ret) > 1 else ret[0]
+
 def load_profiles(
   datadir: str,
   datasets: typing.Union[str, typing.List[str]] = ['train', 'validation', 'test'],
@@ -52,6 +71,15 @@ def load_profiles(
     ret.append(np.copy(depths[il:ir]))
 
   return ret if len(ret) > 1 else ret[0]
+
+def load_xfirst(
+  datadir: str,
+  datasets: typing.Union[str, typing.List[str]] = ['train', 'validation', 'test'],
+  particles: typing.Union[str, typing.List[str]] = ['p', 'He', 'C', 'Si', 'Fe'],
+  nshowers: dict = None,
+) -> pd.DataFrame:
+  
+  return load_fits(datadir, datasets, particles, nshowers)
 
 def make_fits(
   datadir: str,
@@ -98,9 +126,8 @@ def make_fits(
         fits = np.concatenate(list(fits))
         fits = pd.DataFrame(fits, columns = fcn().columns, index = pd.Index(range(len(fits)), name = 'id'))
 
-        file = pathlib.Path(f'{out}/{dsname}/{prm}.parquet').resolve()
-        os.makedirs(file.parent, exist_ok = True)
-        fits.to_parquet(file)
+        file = f'{out}/{dsname}/{prm}.parquet'
+        util.parquet_save(fits, file)
 
         if verbose: print(f'+ {prm} fits saved to {file}')
 
@@ -147,9 +174,9 @@ def make_xfirst_datasets(
     for prm, files in ds.items():
       parser = conex.parser(files = files, branches = branches, nshowers = nshowers[dsname], concat = True)
       data = parser.get_table('pd')
-      file = pathlib.Path(f'{out}/{dsname}/{prm}.parquet').resolve()
-      os.makedirs(file.parent, exist_ok = True)
-      data.to_parquet(file)
+
+      file = f'{out}/{dsname}/{prm}.parquet'
+      util.parquet_save(data, file)
 
       if verbose: print(f'+ {prm} data saved to {file}')
 

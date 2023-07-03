@@ -107,3 +107,18 @@ def npz_save(path, **kwargs) -> None:
   p = pathlib.Path(path).resolve()
   os.makedirs(p.parent, exist_ok = True)
   np.savez_compressed(p, **kwargs)
+
+def parquet_load(path, nrows: int = None) -> pd.DataFrame:
+
+  data = pd.read_parquet(path)
+
+  if nrows is not None:
+    data.drop(data.index[nrows:], inplace = True)
+
+  return data
+
+def parquet_save(data: pd.DataFrame, path: str) -> None:
+
+  p = pathlib.Path(path).resolve()
+  os.makedirs(p.parent, exist_ok = True)
+  data.to_parquet(p)
