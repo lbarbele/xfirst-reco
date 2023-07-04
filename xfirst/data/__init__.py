@@ -189,7 +189,7 @@ def split_conex_files(
   input = pathlib.Path(datadir).resolve()
   nfils = dict(nfiles)
   
-  paths = {p: list(input.glob(f'{p}*/*/*.root')) for p in config.particles}
+  paths = {p: list(input.glob(f'{p}*/**/*.root')) for p in config.particles}
   sizes = {d: nfils[d] for d in config.datasets}
   parts = {p: util.split(paths[p], map_sizes = sizes) for p in config.particles}
   dsets = {d: {p: list(map(str, parts[p][d])) for p in config.particles} for d in config.datasets}
