@@ -181,68 +181,20 @@ def make_xfirst_datasets(
       if verbose: print(f'+ {prm} data saved to {file}')
 
 def split_conex_files(
-  ds,
-  datadir: str,
-  verbose: bool = False,
-  particles: str | list[str] = config.particles,
+  datadir: str | os.PathLike,
+  nfiles: dict[config.dataset_t, int],
   out: str | None = None,
-) -> dict[str, dict[str, list[str]]]:
+) -> dict[config.dataset_t, dict[config.particle_t, list[str]]]:
   
-  datadir = pathlib.Path(datadir).resolve()
-
-  sizes = ds if isinstance(ds, dict) else dict(ds)
-  globs = {p: f'{datadir}/{p}*/*/*.root' for p in particles}
-  paths = {p: util.get_file_list(g) for p, g in globs.items()}
-
-  # check if there are enought files to generate the datasets
-
-  min_files = 0
-  for n in sizes.values():
-    min_files += n
-
-  for prm, files in paths.items():
-    if len(files) < min_files:
-      raise RuntimeError(f'not enough files for particle {prm}')
-
-  # print an overview of the input files
-
-  if verbose:
-    print('overview of the input files:')
-    for prm, files in paths.items():
-      print(f'+ {prm}: {len(files)} files under {globs[prm]}')
-
-  # consume the paths dictionary to create the datasets
-
-  datasets = {dsname: {} for dsname in sizes.keys()}
-  for dsname, size in sizes.items():
-    for prm in paths.keys():
-      datasets[dsname][prm] = paths[prm][:size]
-      paths[prm] = paths[prm][size:]
-
-  # perform checks
-
-  if verbose:
-    print('checking files: ')
-
-  for prm in particles:
-    l = [f for dsname in sizes.keys() for f in datasets[dsname][prm]]
-    if len(l) != len(set(l)):
-      raise RuntimeError(f'file overlap for particle {prm}, this is a bug')
-
-  if verbose:
-    print('+ no overlap')
-
-  for dsname, size in sizes.items():
-    for prm, l in datasets[dsname].items():
-      if len(l) != size:
-        raise RuntimeError(f'wrong value in dataset {dsname}.{prm}')
-      
-  if verbose:
-    print('+ sizes are correct')
-
-  # save output file
+  input = pathlib.Path(datadir).resolve()
+  nfils = dict(nfiles)
+  
+  paths = {p: list(input.glob(f'{p}*/*/*.root')) for p in config.particles}
+  sizes = {d: nfils[d] for d in config.datasets}
+  parts = {p: util.split(paths[p], map_sizes = sizes) for p in config.particles}
+  dsets = {d: {p: list(map(str, parts[p][d])) for p in config.particles} for d in config.datasets}
 
   if out is not None:
-    util.json_dump(datasets, out)
-    
-  return datasets
+    util.json_dump(dsets, out)
+
+  return dsets

@@ -1,7 +1,10 @@
+from collections.abc import Sequence
+import itertools
 import glob
 import json
 import os
 import pathlib
+from typing import overload, Any, Iterable, Mapping
 
 import numpy as np
 import pandas as pd
@@ -122,3 +125,63 @@ def parquet_save(data: pd.DataFrame, path: str) -> None:
   p = pathlib.Path(path).resolve()
   os.makedirs(p.parent, exist_ok = True)
   data.to_parquet(p)
+
+@overload
+def split(data: Sequence[Any], *, indices: Iterable[int]) -> list[Sequence[Any]]:
+  ...
+@overload
+def split(data: Sequence[Any], *, sizes: Iterable[int]) -> list[Sequence[Any]]:
+  ...
+@overload
+def split(data: Sequence[Any], *, batches: int) -> list[Sequence[Any]]:
+  ...
+@overload
+def split(data: Sequence[Any], *, map_sizes: Mapping[Any, int]) -> Mapping[Any, Sequence[Any]]:
+  ...
+def split(data, *, indices = None, sizes = None, batches = None, map_sizes = None):
+  args = {k: v for k, v in locals().items() if k != 'data'}
+
+  if len([v for v in args.values() if v is not None]) != 1:
+    raise ValueError(f'split: exactly one of {list(args.keys())} must be given')
+  
+  if sizes is not None:
+
+    if any([s <= 0 for s in sizes]):
+      raise IndexError(f'split: size of a slice cannot be <= 0')
+
+    idx = [0, *list(itertools.accumulate(sizes))]
+
+    if len(data) < idx[-1]:
+      raise IndexError(f'split: sum of sizes ({idx[-1]}) is larger than the dataset size ({len(data)})')
+    
+    return [data[a:b] for a, b in itertools.pairwise(idx)]
+  
+  elif batches is not None:
+
+    if batches < 1:
+      raise IndexError(f'split: invalid batches count {batches}')
+    if len(data) < batches:
+      raise IndexError(f'split: requested more batches ({batches}) than available data ({len(data)})')
+
+    q, r = divmod(len(data), batches)
+    return split(data, sizes = r*[q+1] + (batches - r)*[q])
+  
+  elif indices is not None:
+
+    idx = sorted({i if i > 0 else (len(data) - i) for i in indices})
+
+    if len(idx) != len(indices):
+      raise IndexError('split: repeated indices are not allowed')
+    if any([i == 0 for i in idx]):
+      raise IndexError('split: index 0 is invalid for index-based split')
+    if any([i >= len(data) for i in idx]):
+      raise IndexError('split: index is out of range')
+    
+    idx = [0, *idx, len(data)]
+    return [data[a:b] for a, b in itertools.pairwise(idx)]
+  
+  elif map_sizes is not None:
+
+    return dict(zip(map_sizes.keys(), split(data, sizes = map_sizes.values())))
+
+  raise RuntimeError('split: unexpected error')
