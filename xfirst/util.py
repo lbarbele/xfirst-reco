@@ -85,19 +85,6 @@ def np_save(path: str | os.PathLike, data: np.ndarray, verbose: bool = False) ->
 
   echo(verbose, f'+ npy saved to {f}')
 
-def npz_load(path: str) -> dict[np.ndarray]:
-
-  with np.load(path) as data:
-    ret = dict(data)
-
-  return ret
-
-def npz_save(path: str, **kwargs) -> None:
-  
-  p = pathlib.Path(path).resolve()
-  os.makedirs(p.parent, exist_ok = True)
-  np.savez_compressed(p, **kwargs)
-
 def parquet_load(path: str, nrows: int | None = None) -> pd.DataFrame:
 
   data = pd.read_parquet(path)

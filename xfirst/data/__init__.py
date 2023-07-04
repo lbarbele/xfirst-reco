@@ -1,15 +1,16 @@
 import collections
-import concurrent.futures
+from concurrent.futures import ProcessPoolExecutor
 import itertools
 import os
 import pathlib
+from typing import Literal, Sequence
 
 import numpy as np
 import pandas as pd
 
 from .. import config
 from .. import util
-from ..profile_functions import usp
+from .. import profile_functions
 
 from . import conex
 
@@ -33,40 +34,41 @@ def load_fits(
   return ret if len(ret) > 1 else ret[0]
 
 def load_profiles(
-  datadir: str,
-  datasets: str | list[str] = config.datasets,
-  particles: str | list[str] = config.particles,
-  nshowers: dict[str, int] | None = None,
-  min_depth: float | None = None,
-  max_depth: float | None = None,
+  datadir: str | os.PathLike,
+  datasets: config.dataset_t | Sequence[config.dataset_t] = config.datasets,
+  particles: config.particle_t | Sequence[config.particle_t] = config.particles,
+  nshowers: dict[config.dataset_t, int] | None = None,
+  cut: config.cut_t | None = None,
   return_depths: bool = False,
-  format: str = 'np',
-) -> dict[str, np.ndarray] | pd.DataFrame:
+  format: Literal['np', 'pd'] = 'np',
+) -> dict[config.dataset_t, np.ndarray] | pd.DataFrame:
   
-  particles = util.as_list(particles)
-  nshw = collections.defaultdict(lambda: None, {} if nshowers is None else nshowers)
+  dir = pathlib.Path(datadir).resolve()
+  pts = [particles] if isinstance(particles, str) else particles
+  dts = [datasets] if isinstance(datasets, str) else datasets
+  nsh = collections.defaultdict(lambda: None, {} if nshowers is None else dict(nshowers))
 
   # read depths and determine depth cuts
-  depths = util.npz_load(f'{datadir}/depths.npz')['depths']
-  il, ir = util.get_range(depths, min_depth, max_depth)
+  depths = np.load(dir/'profiles/depths.npy')
+  il, ir = (None, None) if cut is None else util.get_range(depths, cut.min_depth, cut.max_depth)
   columns = [f'Edep_{i}' for i in range(len(depths))][il:ir]
 
   ret = []
-  for dsname in util.as_list(datasets):
+
+  for d in dts:
     # read data
-    data = {prm: util.npz_load(f'{datadir}/{dsname}/{prm}.npz')[prm] for prm in particles}
+    data = {p: np.load(dir/f'profiles/{d}/{p}.npy', mmap_mode = 'r') for p in pts}
     # apply cuts
-    if nshw[dsname] is not None or il is not None or ir is not None:
-      data = {prm: np.copy(v[:nshw[dsname], il:ir]) for prm, v in data.items()}
+    data = {prm: np.copy(v[:nsh[d], il:ir]) for prm, v in data.items()}
     # format data
     if format == 'np':
-      ret.append(data if len(particles) > 1 else data[particles[0]])
+      ret.append(data if len(pts) > 1 else data[pts[0]])
     elif format == 'pd':
-      ret.append(util.df_from_dict(data, particles, columns))
+      ret.append(util.df_from_dict(data, pts, columns))
     else:
       raise RuntimeError(f'load_profiles: unsupported format {format}')
-
-  # append depth to the return value
+    
+  # append depths array to the return value
   if return_depths:
     ret.append(np.copy(depths[il:ir]))
 
@@ -81,57 +83,52 @@ def load_xfirst(
   
   return load_fits(datadir, datasets, particles, nshowers)
 
+#
+# generate fits 
+# 
+
 def make_fits(
-  datadir: str,
-  out: str,
-  max_train: int | None = None,
-  max_val: int | None = None,
-  max_test: int | None = None,
-  min_depth: float | None = None,
-  max_depth: float | None = None,
+  datadir: str | os.PathLike,
+  nshowers: dict[config.dataset_t, int] | None = None,
   workers: int | None = None,
   verbose: bool = True,
-) -> None:
+):
   
-  workers = os.cpu_count() if workers is None else workers
-  fcn = usp # class, not instance
+  dir = pathlib.Path(datadir).resolve()
+  wrk = os.cpu_count() if workers is None else workers
+  nsh = collections.defaultdict(lambda: None, {} if nshowers is None else dict(nshowers))
+  fcn = profile_functions.usp
 
-  load_args = {
-    'datadir': datadir,
-    'nshowers': {'train': max_train, 'validation': max_val, 'test': max_test},
-    'min_depth': min_depth,
-    'max_depth': max_depth,
-    'return_depths': True,
-    'format': 'np',
-  }
+  util.echo(verbose, f'generating fits for cut configurations {[c.name for c in config.cuts]}')
 
-  for dsname in config.datasets:
-    if verbose: print(f'parsing {dsname} dataset')
+  for c in config.cuts:
+    util.echo(verbose, f'\nprocessing cut configuration {c.name}')
 
-    for prm in config.particles:
-      profiles, depths = load_profiles(datasets = dsname, particles = prm, **load_args)
+    for d, p in itertools.product(config.datasets, config.particles):
+      
+      profiles, depths = load_profiles(
+        datasets = d,
+        particles = p,
+        cut = c,
+        datadir = dir,
+        nshowers = nsh,
+        return_depths = True,
+        format = 'np',
+      )
 
-      split_at = np.repeat(profiles.shape[0]//workers, workers - 1)
-      split_at += (np.arange(workers - 1) < profiles.shape[0]%workers)
-      split_at = split_at.cumsum()
-
-      ys = np.split(profiles, split_at)
+      ys = util.split(profiles, batches = wrk)
       fs = [fcn() for _ in ys]
-      xs = [itertools.repeat(depths, len(y)) for y in ys]
+      xs = [itertools.repeat(np.copy(depths), len(y)) for y in ys]
 
-      with concurrent.futures.ProcessPoolExecutor(workers) as exec:
+      with ProcessPoolExecutor(workers) as exec:
         fits = exec.map(fcn.get_fits, fs, xs, ys)
         fits = np.concatenate(list(fits))
         fits = pd.DataFrame(fits, columns = fcn().columns, index = pd.Index(range(len(fits)), name = 'id'))
+        util.parquet_save(dir/f'fits/range-{c.min_depth}-{c.max_depth}/{d}/{p}', fits, verbose)
 
-        file = f'{out}/{dsname}/{prm}.parquet'
-        util.parquet_save(fits, file)
-
-        if verbose: print(f'+ {prm} fits saved to {file}')
-
-# *
-# * functions to extract data from conex files 
-# *
+#
+# extract data from conex files 
+#
 
 def make_conex_split(
   datadir: str | os.PathLike,
