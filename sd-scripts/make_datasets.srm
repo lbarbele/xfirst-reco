@@ -12,21 +12,8 @@
 
 source /scratch/astroparti/luan.arbeletche/ml-conex-xfirst/sd-scripts/prepare_env.sh
 
-echo '--> calling make_profile_datasets.py'
-
-python "${SCRIPTS_DIR}/make_profile_datasets.py" \
-  --data "${CONEX_JSON}" \
-  --out "${PROFILES_DATA_DIR}" \
-  --max-train "${MAX_TRAIN}" \
-  --max-val "${MAX_VAL}" \
-  --max-test "${MAX_TEST}"
-
-echo ''
-echo '--> calling make_xfirst_datasets.py'
-
-python "${SCRIPTS_DIR}/make_xfirst_datasets.py" \
-  --data "${CONEX_JSON}" \
-  --out "${XFIRST_DATA_DIR}" \
-  --max-train "${MAX_TRAIN}" \
-  --max-val "${MAX_VAL}" \
-  --max-test "${MAX_TEST}"
+python "${SCRIPTS_DIR}/make_datasets.py" \
+  --datadir "${DATA_DIR}" \
+  --nshowers train "${MAX_TRAIN}" \
+  --nshowers validation "${MAX_VAL}" \
+  --nshowers test "${MAX_TEST}"

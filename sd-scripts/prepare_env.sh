@@ -30,13 +30,6 @@ export BASE_DIR="${HOME_DIR}/ml-conex-xfirst"
 export LOGS_DIR="${HOME_DIR}/joblogs/ml-conex-xfirst"
 export DATA_DIR="${BASE_DIR}/data"
 export SCRIPTS_DIR="${BASE_DIR}/scripts"
-export MODELS_DIR="${BASE_DIR}/models"
-export CONEX_DATA_DIR="${DATA_DIR}/conex"
-export PROFILES_DATA_DIR="${DATA_DIR}/profiles"
-export XFIRST_DATA_DIR="${DATA_DIR}/xfirst"
-export FITS_DATA_DIR="${DATA_DIR}/fits/range-${MIN_DEPTH}-${MAX_DEPTH}"
-
-export CONEX_JSON="${DATA_DIR}/conex.json"
 
 # number of showers to use
 
