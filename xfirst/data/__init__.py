@@ -129,67 +129,60 @@ def make_fits(
 
         if verbose: print(f'+ {prm} fits saved to {file}')
 
-def make_profile_datasets(
-  data: str,
-  out: str,
-  max_train: int | None = None,
-  max_val: int | None = None,
-  max_test: int | None = None,
-  verbose: bool = True,
-) -> None:
-  
-  dataset_paths = util.json_load(data)
-  nshowers = {'train': max_train, 'validation': max_val, 'test': max_test}
+# *
+# * functions to extract data from conex files 
+# *
 
-  for dsname, ds in dataset_paths.items():
-    if verbose: print(f'parsing {dsname} dataset')
-
-    for prm, files in ds.items():
-      parser = conex.parser(files = files, branches = ['Edep'], nshowers = nshowers[dsname], concat = True)
-      data = parser.get_table('np')
-      file = pathlib.Path(f'{out}/{dsname}/{prm}.npz').resolve()
-      util.npz_save(file, **{prm: data})
-
-      if verbose: print(f'+ {prm} data saved to {file}')
-  
-  depths = conex.parser(files = dataset_paths[dsname][prm], branches = ['Xdep'], nshowers = 1, concat = True)[0]
-  util.npz_save(f'{out}/depths.npz', depths = depths)
-
-def make_xfirst_datasets(
-  data: str,
-  out: str,
-  max_train: int | None = None,
-  max_val: int | None = None,
-  max_test: int | None = None,
-  verbose: bool = True,
-) -> None:
-  
-  branches = ['Xfirst', 'lgE', 'Nmx', 'Xmx']
-  dataset_paths = util.json_load(data)
-  nshowers = {'train': max_train, 'validation': max_val, 'test': max_test}
-
-  for dsname, ds in dataset_paths.items():
-    if verbose: print(f'parsing {dsname} dataset')
-
-    for prm, files in ds.items():
-      parser = conex.parser(files = files, branches = branches, nshowers = nshowers[dsname], concat = True)
-      data = parser.get_table('pd')
-
-      file = f'{out}/{dsname}/{prm}.parquet'
-      util.parquet_save(data, file)
-
-      if verbose: print(f'+ {prm} data saved to {file}')
-
-def split_conex_files(
+def make_conex_split(
   datadir: str | os.PathLike,
-  nfiles: dict[config.dataset_t, int],
+  nshowers: dict[config.dataset_t, int],
 ) -> dict[config.dataset_t, dict[config.particle_t, list[str]]]:
   
   dir = pathlib.Path(datadir).resolve(strict = True)
-  nfl = dict(nfiles)
+  ret = {d: {} for d in config.datasets}
+  
+  for p in config.particles:
+    files = set(map(str, dir.glob(f'conex/{p}*/**/*.root')))
+    for d in config.datasets:
+      ret[d][p] = conex.parser(files, [], nshowers[d]).files
+      files -= set(ret[d][p])
 
-  sizes = {d: nfl[d] for d in config.datasets}
-  paths = {p: list(dir.glob(f'conex/{p}*/**/*.root')) for p in config.particles}
-  parts = {p: util.split(paths[p], map_sizes = sizes) for p in config.particles}
+  return dict(ret)
 
-  return {d: {p: list(map(str, parts[p][d])) for p in config.particles} for d in config.datasets}
+def make_datasets(
+  datadir: str | os.PathLike,
+  nshowers: dict[config.dataset_t, int] | None = None,
+  refresh: bool = False,
+  verbose: bool = True,
+) -> None:
+  dir = pathlib.Path(datadir).resolve()
+  nsh = collections.defaultdict(lambda: None, {} if nshowers is None else dict(nshowers))
+  bcs = ('Xfirst', 'lgE')
+
+  # split conex files, if hasn't been done already
+  conexjson = dir/'conex.json'
+  if not conexjson.exists() or refresh:
+    util.echo(verbose, 'splitting conex files')
+    conexpaths = make_conex_split(datadir, nshowers)
+    util.json_dump(conexpaths, conexjson)
+    util.echo(verbose, f'+ conex json saved to {conexjson}\n')
+  else:
+    conexpaths = util.json_load(conexjson)
+
+  # profiles
+  util.echo(verbose, 'generating profile datasets')
+
+  for d, p in itertools.product(config.datasets, config.particles):
+    data = conex.parser(files = conexpaths[d][p], branches = ['Edep'], nshowers = nsh[d], concat = True).get_table('np')
+    util.np_save(dir/'profiles'/d/p, data, verbose)
+
+  # depths
+  util.echo(verbose, '\nsaving slant depth profile')
+  depths = conex.parser(files = conexpaths[d][p], branches = ['Xdep'], nshowers = 1, concat = True)[0]
+  util.np_save(dir/'profiles'/'depths', depths, verbose)
+
+  # xfirst
+  util.echo(verbose, '\ngenerating xfirst datasets')
+  for d, p in itertools.product(config.datasets, config.particles):
+    data = conex.parser(files = conexpaths[d][p], branches = bcs, nshowers = nsh[d], concat = True).get_table('pd')
+    util.parquet_save(dir/'xfirst'/d/p, data, verbose)

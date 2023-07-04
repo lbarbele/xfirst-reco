@@ -37,6 +37,9 @@ def df_from_dict(
 
   return pd.concat(dfs, keys = keys)
 
+def echo(verbose: bool, msg) -> None:
+  if verbose:
+    print(msg)
 
 def json_dump(data: dict, path: str) -> None:
 
@@ -44,30 +47,6 @@ def json_dump(data: dict, path: str) -> None:
   os.makedirs(p.parent, exist_ok = True)
   with open(p, 'w') as f:
     f.write(json.dumps(data, indent = 2))
-
-def get_file_list(
-  globs: str | list[str],
-  sort: bool = True,
-  absolute: bool = True,
-) -> list[str]:
-  """
-  Takes as input a single glob or a list of globs, resolve them and
-  returns a list of strings containing all file paths that match the
-  given globs.
-  """
-
-  if isinstance(globs, str):
-    files = glob.glob(globs)
-    if len(files) == 0: raise RuntimeError(f'bad path "{globs}"')
-    if sort: files.sort()
-    if absolute: files = [str(pathlib.Path(f).resolve()) for f in files]
-    return files
-  elif isinstance(globs, list) or isinstance(globs, tuple):
-    files = [f for g in globs for f in get_file_list(g, sort = False)]
-    if sort: files.sort()
-    return files
-  else:
-    raise RuntimeError(f'get_file_list: bad input "{globs}"')
   
 def get_range(values: np.ndarray, min_value: float | None = None, max_value: float | None = None) -> tuple[int | None, int | None]:
 
@@ -98,6 +77,14 @@ def json_load(path: str) -> dict:
 
   return data
 
+def np_save(path: str | os.PathLike, data: np.ndarray, verbose: bool = False) -> None:
+
+  f = pathlib.Path(path).resolve().with_suffix('.npy')
+  os.makedirs(f.parent, exist_ok = True)
+  np.save(f, data)
+
+  echo(verbose, f'+ npy saved to {f}')
+
 def npz_load(path: str) -> dict[np.ndarray]:
 
   with np.load(path) as data:
@@ -120,11 +107,13 @@ def parquet_load(path: str, nrows: int | None = None) -> pd.DataFrame:
 
   return data
 
-def parquet_save(data: pd.DataFrame, path: str) -> None:
+def parquet_save(path: str | os.PathLike, data: pd.DataFrame, verbose: bool = False) -> None:
 
-  p = pathlib.Path(path).resolve()
+  p = pathlib.Path(path).resolve().with_suffix('.parquet')
   os.makedirs(p.parent, exist_ok = True)
   data.to_parquet(p)
+
+  echo(verbose, f'+ parquet file saved to {p}')
 
 @overload
 def split(data: Sequence[Any], *, indices: Iterable[int]) -> list[Sequence[Any]]:

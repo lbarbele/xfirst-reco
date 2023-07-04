@@ -1,27 +1,35 @@
+import os
+from typing import Iterable
+
 import numpy as np
 import pandas as pd
 import ROOT
 
-from ..util import get_file_list as _get_file_list
-
 def get_conex_tree(
-  files: str | list[str],
+  files: str | os.PathLike | Iterable[str | os.PathLike],
   tree_name: str,
-  max_entries: int | None = None
+  entries: int | None = None
 ) -> ROOT.TChain:
   
-  if max_entries is not None and (not isinstance(max_entries, int) or max_entries < 1):
-    raise RuntimeError(f'get_conex_tree: invalid max_entries parameter {max_entries}')
+  fls = iter([str(files)]) if isinstance(files, str | os.PathLike) else map(str, files)
+  ret = ROOT.TChain(tree_name, tree_name)
 
-  chain = ROOT.TChain(tree_name, tree_name)
+  if entries is not None:
 
-  for file in _get_file_list(files):
-    chain.Add(file)
+    if entries <= 0:
+      raise ValueError(f'get_conex_tree: invalid entries parameter {entries}')
+    
+    while entries > ret.GetEntries():
+      try:
+        ret.Add(next(fls))
+      except StopIteration:
+        raise RuntimeError(f'get_conex_tree: requested more entries ({entries}) than available ({ret.GetEntries()})')
+      
+  else:
+    for f in fls:
+      ret.Add(f)
 
-    if max_entries is not None and chain.GetEntries() >= max_entries:
-      break
-
-  return chain
+  return ret
 
 class parser:
 
