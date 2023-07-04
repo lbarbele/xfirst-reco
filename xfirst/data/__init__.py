@@ -183,18 +183,13 @@ def make_xfirst_datasets(
 def split_conex_files(
   datadir: str | os.PathLike,
   nfiles: dict[config.dataset_t, int],
-  out: str | None = None,
 ) -> dict[config.dataset_t, dict[config.particle_t, list[str]]]:
   
-  input = pathlib.Path(datadir).resolve()
-  nfils = dict(nfiles)
-  
-  paths = {p: list(input.glob(f'{p}*/**/*.root')) for p in config.particles}
-  sizes = {d: nfils[d] for d in config.datasets}
+  dir = pathlib.Path(datadir).resolve(strict = True)
+  nfl = dict(nfiles)
+
+  sizes = {d: nfl[d] for d in config.datasets}
+  paths = {p: list(dir.glob(f'conex/{p}*/**/*.root')) for p in config.particles}
   parts = {p: util.split(paths[p], map_sizes = sizes) for p in config.particles}
-  dsets = {d: {p: list(map(str, parts[p][d])) for p in config.particles} for d in config.datasets}
 
-  if out is not None:
-    util.json_dump(dsets, out)
-
-  return dsets
+  return {d: {p: list(map(str, parts[p][d])) for p in config.particles} for d in config.datasets}
