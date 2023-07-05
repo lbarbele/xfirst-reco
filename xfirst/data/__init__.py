@@ -66,6 +66,7 @@ def load_tables(
   datasets: config.dataset_t | Sequence[config.dataset_t] = config.datasets,
   particles: config.particle_t | Sequence[config.particle_t] = config.particles,
   nshowers: dict[config.dataset_t, int] | None = None,
+  columns: str | Sequence[str] | None = None,
 ) -> pd.DataFrame | list[pd.DataFrame] :
   
   tabdir = pathlib.Path(path).resolve()
@@ -77,7 +78,11 @@ def load_tables(
 
   for d in dts:
     with concurrent.futures.ProcessPoolExecutor(1) as exec:
-      data = exec.map(util.parquet_load, [tabdir/d/p for p in pts], itertools.repeat(nsh.get(d), len(pts)))
+      ps = [tabdir/d/p for p in pts]
+      ns = itertools.repeat(nsh.get(d), len(ps))
+      cs = itertools.repeat(columns, len(ps))
+
+      data = exec.map(util.parquet_load, ps, ns, cs)
       data = pd.concat(data, keys = pts, copy = False)
       ret.append(data)
 
@@ -89,6 +94,7 @@ def load_fits(
   datasets: config.dataset_t | Sequence[config.dataset_t] = config.datasets,
   particles: config.particle_t | Sequence[config.particle_t] = config.particles,
   nshowers: dict[config.dataset_t, int] | None = None,
+  columns: str | Sequence[str] | None = None,
 ) -> pd.DataFrame | list[pd.DataFrame] :
   
   c = config.cuts.get(cut)
@@ -97,16 +103,17 @@ def load_fits(
   if not p.exists():
     raise RuntimeError(f'load_fits: fits for cut range [{c.min_depth}, {c.max_depth}] do not exist')
 
-  return load_tables(p, datasets, particles, nshowers)
+  return load_tables(p, datasets, particles, nshowers, columns)
 
 def load_xfirst(
   datadir: str | os.PathLike,
   datasets: config.dataset_t | Sequence[config.dataset_t] = config.datasets,
   particles: config.particle_t | Sequence[config.particle_t] = config.particles,
   nshowers: dict[config.dataset_t, int] | None = None,
+  columns: str | Sequence[str] | None = None,
 ) -> pd.DataFrame | list[pd.DataFrame] :
   
-  return load_tables(f'{datadir}/xfirst', datasets, particles, nshowers)
+  return load_tables(f'{datadir}/xfirst', datasets, particles, nshowers, columns)
 
 #
 # generate fits 

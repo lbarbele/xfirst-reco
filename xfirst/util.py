@@ -84,10 +84,10 @@ def np_save(path: str | os.PathLike, data: np.ndarray, verbose: bool = False) ->
 
   echo(verbose, f'+ npy saved to {f}')
 
-def parquet_load(path: str, nrows: int | None = None) -> pd.DataFrame:
+def parquet_load(path: str, nrows: int | None = None, columns: list[str] | None = None) -> pd.DataFrame:
 
   p = pathlib.Path(path).resolve().with_suffix('.parquet')
-  d = pd.read_parquet(p)
+  d = pd.read_parquet(p, columns = columns)
 
   if nrows is not None:
     d.drop(d.index[nrows:], inplace = True)
