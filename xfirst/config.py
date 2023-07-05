@@ -57,7 +57,7 @@ _cuts = (
   ),
 )
 
-def _cuts_get(i):
+def get_cut(i):
   if i is None:
     return cut_t('none', None, None)
   elif isinstance(i, cut_t):
@@ -77,6 +77,6 @@ def _cuts_get(i):
     if isinstance(i[0], float | int) and isinstance(i[1], float | int):
       return cut_t('unnamed', int(i[0]), int(i[1]))
 
-  raise ValueError(f'cuts.get: non existent cut {i}')
+  raise ValueError(f'get_cuts: non existent cut {i}')
 
-cuts = namedtuple('cuts_tuple', [c.name for c in _cuts] + ['get'])(*_cuts, get = _cuts_get)
+cuts = namedtuple('cuts_tuple', [c.name for c in _cuts])(*_cuts)

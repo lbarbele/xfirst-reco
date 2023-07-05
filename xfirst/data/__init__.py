@@ -31,7 +31,7 @@ def load_profiles(
   pts = [particles] if isinstance(particles, str) else particles
   dts = [datasets] if isinstance(datasets, str) else datasets
   nsh = {} if nshowers is None else dict(nshowers)
-  cut = config.cuts.get(cut)
+  cut = config.get_cut(cut)
 
   # read depths and determine depth cuts
   depths = np.load(profdir/'depths.npy')
@@ -97,7 +97,7 @@ def load_fits(
   columns: str | Sequence[str] | None = None,
 ) -> pd.DataFrame | list[pd.DataFrame] :
   
-  c = config.cuts.get(cut)
+  c = config.get_cut(cut)
   p = pathlib.Path(f'{datadir}/fits/range-{c.min_depth}-{c.max_depth}').resolve()
 
   if not p.exists():
