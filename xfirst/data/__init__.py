@@ -78,12 +78,16 @@ def load_tables(
 
   for d in dts:
     with concurrent.futures.ProcessPoolExecutor(1) as exec:
-      ps = [tabdir/d/p for p in pts]
-      ns = itertools.repeat(nsh.get(d), len(ps))
-      cs = itertools.repeat(columns, len(ps))
-
-      data = exec.map(util.parquet_load, ps, ns, cs)
-      data = pd.concat(data, keys = pts, copy = False, names = ['particle'])
+      if len(pts) == 1:
+        data = exec.submit(util.parquet_load, tabdir/d/pts[0], nsh.get(d), columns)
+        data = data.result()
+      else:
+        ps = [tabdir/d/p for p in pts]
+        ns = itertools.repeat(nsh.get(d), len(ps))
+        cs = itertools.repeat(columns, len(ps))
+        data = exec.map(util.parquet_load, ps, ns, cs)
+        data = pd.concat(data, keys = pts, copy = False, names = ['particle'])
+        
       ret.append(data)
 
   return ret if len(ret) > 1 else ret[0]
