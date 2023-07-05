@@ -61,7 +61,11 @@ class profile_function(abc.ABC):
   
   @property
   def columns(self):
-    return self.parameter_names + [f'e_{p}' for p in self.parameter_names] + ['status', 'chi2', 'ndf']
+    return self.parameter_names + self.err_names + ['status', 'chi2', 'ndf']
+  
+  @property
+  def err_names(self):
+    return [f'e_{param}' for param in self.parameter_names]
 
   @property
   def errors(self):
