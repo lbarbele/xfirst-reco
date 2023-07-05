@@ -24,7 +24,7 @@ def load_profiles(
   nshowers: dict[config.dataset_t, int] | None = None,
   cut: config.cut_t | str | dict | Sequence[float | int] | None = None,
   return_depths: bool = False,
-  format: Literal['np', 'pd'] = 'np',
+  format: Literal['np', 'pd', 'mm'] = 'np',
 ) -> dict[config.dataset_t, np.ndarray] | pd.DataFrame:
   
   profdir = pathlib.Path(datadir).resolve()/'profiles'
@@ -44,12 +44,14 @@ def load_profiles(
     # read data
     data = {p: np.load(profdir/f'{d}/{p}.npy', mmap_mode = 'r') for p in pts}
     # apply cuts
-    data = {prm: np.copy(v[:nsh.get(d), il:ir]) for prm, v in data.items()}
+    data = {p: v[:nsh.get(d), il:ir] for p, v in data.items()}
     # format data
-    if format == 'np':
+    if format == 'mm':
       ret.append(data if len(pts) > 1 else data[pts[0]])
     elif format == 'pd':
       ret.append(util.df_from_dict(data, pts, columns))
+    elif format == 'np':
+      data = {p: np.copy(data[p]) for p in pts}
     else:
       raise RuntimeError(f'load_profiles: unsupported format {format}')
     
