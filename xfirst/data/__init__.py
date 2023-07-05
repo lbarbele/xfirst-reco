@@ -14,31 +14,16 @@ from .. import profile_functions
 
 from . import conex
 
-def load_fits(
-  datadir: str,
-  datasets: str | list[str] = config.datasets,
-  particles: str | list[str] = config.particles,
-  nshowers: dict[str, int] | None = None,
-) -> pd.DataFrame:
-  
-  particles = util.as_list(particles)
-  nshw = collections.defaultdict(lambda: None, {} if nshowers is None else nshowers)
-
-  ret = []
-
-  for dsname in util.as_list(datasets):
-    data = [util.parquet_load(f'{datadir}/{dsname}/{prm}.parquet', nshw[dsname]) for prm in particles]
-    data = pd.concat(data, keys = particles)
-    ret.append(data)
-
-  return ret if len(ret) > 1 else ret[0]
+#
+# dataset loaders
+#
 
 def load_profiles(
   datadir: str | os.PathLike,
   datasets: config.dataset_t | Sequence[config.dataset_t] = config.datasets,
   particles: config.particle_t | Sequence[config.particle_t] = config.particles,
   nshowers: dict[config.dataset_t, int] | None = None,
-  cut: config.cut_t | None = None,
+  cut: config.cut_t | str | dict | Sequence[float | int] | None = None,
   return_depths: bool = False,
   format: Literal['np', 'pd'] = 'np',
 ) -> dict[config.dataset_t, np.ndarray] | pd.DataFrame:
@@ -47,10 +32,11 @@ def load_profiles(
   pts = [particles] if isinstance(particles, str) else particles
   dts = [datasets] if isinstance(datasets, str) else datasets
   nsh = collections.defaultdict(lambda: None, {} if nshowers is None else dict(nshowers))
+  cut = config.cuts.get(cut)
 
   # read depths and determine depth cuts
   depths = np.load(dir/'profiles/depths.npy')
-  il, ir = (None, None) if cut is None else util.get_range(depths, cut.min_depth, cut.max_depth)
+  il, ir = util.get_range(depths, cut.min_depth, cut.max_depth)
   columns = [f'Edep_{i}' for i in range(len(depths))][il:ir]
 
   ret = []
@@ -74,14 +60,52 @@ def load_profiles(
 
   return ret if len(ret) > 1 else ret[0]
 
-def load_xfirst(
-  datadir: str,
-  datasets: str | list[str] = config.datasets,
-  particles: str | list[str] = config.particles,
-  nshowers: dict[str, int] | None = None,
-) -> pd.DataFrame:
+def load_tables(
+  dir: str | os.PathLike,
+  datasets: config.dataset_t | Sequence[config.dataset_t] = config.datasets,
+  particles: config.particle_t | Sequence[config.particle_t] = config.particles,
+  nshowers: dict[config.dataset_t, int] | None = None,
+) -> pd.DataFrame | list[pd.DataFrame] :
   
-  return load_fits(datadir, datasets, particles, nshowers)
+  dir = pathlib.Path(dir).resolve()
+  pts = [particles] if isinstance(particles, str) else particles
+  dts = [datasets] if isinstance(datasets, str) else datasets
+  nsh = collections.defaultdict(lambda: None, {} if nshowers is None else dict(nshowers))
+
+  ret = []
+
+  for d in dts:
+    with ProcessPoolExecutor(1) as exec:
+      data = exec.map(util.parquet_load, [dir/d/p for p in pts], itertools.repeat(nsh[d], len(pts)))
+      data = pd.concat(data, keys = pts, copy = False)
+      ret.append(data)
+
+  return ret if len(ret) > 1 else ret[0]
+
+def load_fits(
+  datadir: str | os.PathLike,
+  cut: config.cut_t | str | dict | Sequence[float | int],
+  datasets: config.dataset_t | Sequence[config.dataset_t] = config.datasets,
+  particles: config.particle_t | Sequence[config.particle_t] = config.particles,
+  nshowers: dict[config.dataset_t, int] | None = None,
+) -> pd.DataFrame | list[pd.DataFrame] :
+  
+  c = config.cuts.get(cut)
+  p = pathlib.Path(f'{datadir}/fits/range-{c.min_depth}-{c.max_depth}').resolve()
+
+  if not p.exists():
+    raise RuntimeError(f'load_fits: fits for cut range [{c.min_depth}, {c.max_depth}] do not exist')
+
+  return load_tables(p, datasets, particles, nshowers)
+
+def load_xfirst(
+  datadir: str | os.PathLike,
+  datasets: config.dataset_t | Sequence[config.dataset_t] = config.datasets,
+  particles: config.particle_t | Sequence[config.particle_t] = config.particles,
+  nshowers: dict[config.dataset_t, int] | None = None,
+) -> pd.DataFrame | list[pd.DataFrame] :
+  
+  return load_tables(f'{datadir}/xfirst', datasets, particles, nshowers)
 
 #
 # generate fits 
@@ -152,6 +176,7 @@ def make_datasets(
   refresh: bool = False,
   verbose: bool = True,
 ) -> None:
+  
   dir = pathlib.Path(datadir).resolve()
   nsh = collections.defaultdict(lambda: None, {} if nshowers is None else dict(nshowers))
   bcs = ('Xfirst', 'lgE')

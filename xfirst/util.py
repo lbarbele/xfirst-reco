@@ -40,13 +40,6 @@ def df_from_dict(
 def echo(verbose: bool, msg) -> None:
   if verbose:
     print(msg)
-
-def json_dump(data: dict, path: str) -> None:
-
-  p = pathlib.Path(path).resolve()
-  os.makedirs(p.parent, exist_ok = True)
-  with open(p, 'w') as f:
-    f.write(json.dumps(data, indent = 2))
   
 def get_range(values: np.ndarray, min_value: float | None = None, max_value: float | None = None) -> tuple[int | None, int | None]:
 
@@ -69,7 +62,13 @@ def get_range(values: np.ndarray, min_value: float | None = None, max_value: flo
   
   return ileft, iright
 
-  
+def json_dump(data: dict, path: str) -> None:
+
+  p = pathlib.Path(path).resolve()
+  os.makedirs(p.parent, exist_ok = True)
+  with open(p, 'w') as f:
+    f.write(json.dumps(data, indent = 2))
+
 def json_load(path: str) -> dict:
 
   with open(path, 'r') as f:
@@ -87,12 +86,13 @@ def np_save(path: str | os.PathLike, data: np.ndarray, verbose: bool = False) ->
 
 def parquet_load(path: str, nrows: int | None = None) -> pd.DataFrame:
 
-  data = pd.read_parquet(path)
+  p = pathlib.Path(path).resolve().with_suffix('.parquet')
+  d = pd.read_parquet(p)
 
   if nrows is not None:
-    data.drop(data.index[nrows:], inplace = True)
+    d.drop(d.index[nrows:], inplace = True)
 
-  return data
+  return d
 
 def parquet_save(path: str | os.PathLike, data: pd.DataFrame, verbose: bool = False) -> None:
 
