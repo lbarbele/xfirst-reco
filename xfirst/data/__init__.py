@@ -51,7 +51,7 @@ def load_profiles(
     elif format == 'pd':
       ret.append(util.df_from_dict(data, pts, columns))
     elif format == 'np':
-      data = {p: np.copy(data[p]) for p in pts}
+      ret.append({p: np.copy(data[p]) for p in pts} if len(pts) > 1 else np.copy(data[pts[0]]))
     else:
       raise RuntimeError(f'load_profiles: unsupported format {format}')
     
