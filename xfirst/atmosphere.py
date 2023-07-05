@@ -27,7 +27,7 @@ class atmosphere(abc.ABC):
     else:
       return self.c[4]*(self.a[4] - x)/self.b[4]
 
-  def get_depth(self, height: float | np.adarray) -> float | np.ndarray:
+  def get_depth(self, height: float | np.ndarray) -> float | np.ndarray:
 
     hs = height if isinstance(height, np.ndarray) else [height]
     xs = [self._get_depth(h) for h in hs]
@@ -37,7 +37,7 @@ class atmosphere(abc.ABC):
 
     return np.array(xs, dtype = np.float64) if len(xs) > 1 else xs[0]
   
-  def get_height(self, depth: float | np.adarray) -> float | np.adarray:
+  def get_height(self, depth: float | np.ndarray) -> float | np.ndarray:
     
     xs = depth if isinstance(depth, np.ndarray) else [depth]
     hs = [self._get_height(x) for x in xs]
