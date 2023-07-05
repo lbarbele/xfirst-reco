@@ -83,7 +83,7 @@ def load_tables(
       cs = itertools.repeat(columns, len(ps))
 
       data = exec.map(util.parquet_load, ps, ns, cs)
-      data = pd.concat(data, keys = pts, copy = False)
+      data = pd.concat(data, keys = pts, copy = False, names = ['particle'])
       ret.append(data)
 
   return ret if len(ret) > 1 else ret[0]
