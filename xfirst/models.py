@@ -9,6 +9,10 @@ import numpy as np
 import pandas as pd
 import xgboost
 
+# *
+# * model classes
+# *
+
 class model(abc.ABC):
   @abc.abstractmethod
   def draw(self):
@@ -44,7 +48,6 @@ class model(abc.ABC):
       return pd.DataFrame(results, columns = cols, index = idx)
     else:
       raise ValueError(f'model.test: invalid format {format}')
-
 
 class gradient_boosting_regressor(model):
   def __init__(self, **kwargs):
@@ -82,7 +85,6 @@ class gradient_boosting_regressor(model):
     p = pathlib.Path(path).resolve()
     os.makedirs(p.parent, exist_ok = True)
     self.xgb.save_model(p.with_suffix('.ubj'))
-
 
   @property
   def xgb(self):
