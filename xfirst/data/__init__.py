@@ -121,6 +121,7 @@ def load_fits(
   nshowers: dict[config.dataset_t, int] | None = None,
   columns: str | Sequence[str] | None = None,
   drop_bad: bool = False,
+  xfirst: bool = False,
 ) -> pd.DataFrame | list[pd.DataFrame] :
   
   c = config.get_cut(cut)
@@ -130,6 +131,10 @@ def load_fits(
     raise RuntimeError(f'load_fits: fits for cut range [{c.min_depth}, {c.max_depth}] do not exist')
   
   ret = load_tables(p, datasets, particles, nshowers, columns)
+
+  if xfirst:
+    xf = load_xfirst(datadir, datasets, particles, nshowers)
+    ret = ret.join(xf) if len(datasets) == 1 else [a.join(b) for a, b in zip(ret, xf)]
 
   if drop_bad:
     for df in (ret if isinstance(ret, list) else [ret]):
