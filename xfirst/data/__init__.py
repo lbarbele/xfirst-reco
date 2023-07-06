@@ -86,14 +86,14 @@ def load_tables(
   path: str | os.PathLike,
   datasets: config.dataset_t | Sequence[config.dataset_t] = config.datasets,
   particles: config.particle_t | Sequence[config.particle_t] = config.particles,
-  nshowers: dict[config.dataset_t, int] | None = None,
+  nshowers: dict[config.dataset_t, int] | int | None = None,
   columns: str | Sequence[str] | None = None,
 ) -> pd.DataFrame | list[pd.DataFrame] :
   
   tabdir = pathlib.Path(path).resolve()
   pts = [particles] if isinstance(particles, str) else particles
   dts = [datasets] if isinstance(datasets, str) else datasets
-  nsh = {} if nshowers is None else dict(nshowers)
+  nsh = {d: nshowers for d in config.datasets} if isinstance(nshowers, int | None) else dict(nshowers)
 
   ret = []
 
@@ -118,7 +118,7 @@ def load_fits(
   cut: config.cut_t | str | dict | Sequence[float | int],
   datasets: config.dataset_t | Sequence[config.dataset_t] = config.datasets,
   particles: config.particle_t | Sequence[config.particle_t] = config.particles,
-  nshowers: dict[config.dataset_t, int] | None = None,
+  nshowers: dict[config.dataset_t, int] | int | None = None,
   columns: str | Sequence[str] | None = None,
   drop_bad: bool = False,
   xfirst: bool = False,
@@ -146,7 +146,7 @@ def load_xfirst(
   datadir: str | os.PathLike,
   datasets: config.dataset_t | Sequence[config.dataset_t] = config.datasets,
   particles: config.particle_t | Sequence[config.particle_t] = config.particles,
-  nshowers: dict[config.dataset_t, int] | None = None,
+  nshowers: dict[config.dataset_t, int] | int | None = None,
   columns: str | Sequence[str] | None = None,
 ) -> pd.DataFrame | list[pd.DataFrame] :
   
