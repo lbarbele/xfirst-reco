@@ -63,7 +63,7 @@ def normalize(datasets, columns: Sequence[str | int]):
   else:
     raise ValueError('normalize: unsupported input')
 
-  return [a, *bs, means, stds]
+  return [*bs, means, stds]
 
 #
 # dataset loaders
@@ -154,6 +154,7 @@ def load_fits(
   drop_bad: bool = False,
   xfirst: bool = False,
   norm: Sequence[str] | None = None,
+  format: Literal['list', 'dict'] = 'list',
 ) -> pd.DataFrame | list[pd.DataFrame] :
   
   c = config.get_cut(cut)
@@ -172,7 +173,22 @@ def load_fits(
     for df in (ret if isinstance(ret, list) else [ret]):
       df.drop(df.index[~good_fits_mask(df, c)], inplace = True)
 
-  return ret if norm is None else normalize(ret, columns = norm)
+  if norm:
+    ret = normalize(ret, columns = norm)
+
+  if format == 'list':
+    return ret
+  elif format == 'dict':
+    if norm:
+      keys = [datasets] if isinstance(datasets, str) else list(datasets)
+      keys += ['mean', 'std']
+      return dict(zip(keys, ret))
+    elif isinstance(datasets, str):
+      return {datasets: ret}
+    else:
+      return dict(zip(datasets, ret))
+  else:
+    raise ValueError(f'load_fits: unsupported format {format}')
 
 def load_xfirst(
   datadir: str | os.PathLike,
