@@ -17,6 +17,7 @@ def draw_fit_parameters(
   pallete: str = 'rocket',
   nbins: int = 50,
   annot: bool = True,
+  limits: dict[str, tuple[float, float]] | None = None
 ) -> matplotlib.figure.Figure:
   
   if hasattr(data.index, 'levels'):
@@ -66,16 +67,21 @@ def draw_fit_parameters(
     ax.annotate(f'max: {v.max():.4g}', xy = (0.03, 0.90), xycoords = 'axes fraction', fontsize = 8)
 
   def compute(param):
-    if param == 'stat':
+    if param == 'stat' and not 'stat' in data:
       values = data.loc[:, 'chi2']/data.loc[:, 'ndf']
     else:
       values = data.loc[:, param]
 
+    if limits is not None and param in limits:
+      l = limits[param]
+    else:
+      l = (values.min(), values.max())
+
     if scales[param] == 'log':
       values = values.loc[values > 0]
-      bins = 10**np.linspace(np.log10(values.min()), np.log10(values.max()), nbins + 1)
+      bins = 10**np.linspace(np.log10(l[0]), np.log10(l[1]), nbins + 1)
     else:
-      bins = np.linspace(values.min(), values.max(), nbins + 1)
+      bins = np.linspace(l[0], l[1], nbins + 1)
 
     return values, bins
   
