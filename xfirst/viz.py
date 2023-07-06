@@ -106,3 +106,5 @@ def draw_fit_parameters(
     axes[-1].legend()
 
   fig.tight_layout()
+
+  return fig
