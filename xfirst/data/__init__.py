@@ -34,6 +34,37 @@ def good_fits_mask(
   
   return mask
 
+def normalize(datasets, columns: Sequence[str | int]):
+  
+  if isinstance(datasets, list):
+    a = datasets[0]
+    bs = datasets
+  elif isinstance(datasets, dict):
+    a = datasets['train']
+    bs = [v for v in datasets.values()]
+  else:
+    a = datasets
+    bs = [datasets]
+
+  if isinstance(a, pd.DataFrame):
+    means = a.loc[:, columns].mean(axis = 0)
+    stds = a.loc[:, columns].std(axis = 0)
+
+    for b in bs:
+      b.loc[:, columns] = (b.loc[:, columns] - means) / stds
+
+  elif isinstance(a, np.ndarray):
+    means = a[:, columns].mean(axis = 0)
+    stds = a[:, columns].std(axis = 0)
+
+    for b in bs:
+      b[:, columns] = (b[:, columns] - means) / stds
+  
+  else:
+    raise ValueError('normalize: unsupported input')
+
+  return [a, *bs, means, stds]
+
 #
 # dataset loaders
 #
@@ -122,6 +153,7 @@ def load_fits(
   columns: str | Sequence[str] | None = None,
   drop_bad: bool = False,
   xfirst: bool = False,
+  norm: Sequence[str] | None = None,
 ) -> pd.DataFrame | list[pd.DataFrame] :
   
   c = config.get_cut(cut)
@@ -140,7 +172,7 @@ def load_fits(
     for df in (ret if isinstance(ret, list) else [ret]):
       df.drop(df.index[~good_fits_mask(df, c)], inplace = True)
 
-  return ret
+  return ret if norm is None else normalize(ret, columns = norm)
 
 def load_xfirst(
   datadir: str | os.PathLike,
