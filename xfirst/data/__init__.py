@@ -14,6 +14,27 @@ from .. import profile_functions
 from . import conex
 
 #
+# data transformations
+#
+
+def good_fits_mask(
+  fits: pd.DataFrame,
+  cut: config.cut_t | str,
+) -> pd.Series:
+  
+  c = config.get_cut(cut)
+
+  fits.replace([np.inf, -np.inf], np.nan, inplace = True)
+  
+  mask = True
+  mask &= (fits.status > 0.99)
+  mask &= ~(fits.isna().any(axis = 1))
+  mask &= (c.min_depth+10 < fits.Xmax) & (fits.Xmax < c.max_depth-10)
+  mask &= (fits > 0).all(axis = 1)
+  
+  return mask
+
+#
 # dataset loaders
 #
 
@@ -112,10 +133,7 @@ def load_fits(
 
   if drop_bad:
     for df in (ret if isinstance(ret, list) else [ret]):
-      bad_status = df.index[df.status < 0.99]
-      df.drop(bad_status, inplace = True)
-      df.replace([np.inf, -np.inf], np.nan, inplace = True)
-      df.dropna(inplace = True)
+      df.drop(df.index[~good_fits_mask(df, c)], inplace = True)
 
   return ret
 
