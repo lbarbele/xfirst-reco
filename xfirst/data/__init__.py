@@ -35,10 +35,13 @@ def good_fits_mask(
   return mask
 
 def drop_bad_fits(
-  fits: pd.DataFrame,
+  fits: pd.DataFrame | Sequence[pd.DataFrame],
   cut: config.cut_t | str,
   inplace: bool = True,
 ) -> pd.DataFrame:
+  
+  if isinstance(fits, Sequence):
+    return [drop_bad_fits(frame, cut, inplace) for frame in fits]
   
   good = good_fits_mask(fits, cut)
   idx = fits.index[~good]
@@ -185,8 +188,7 @@ def load_fits(
     ret = ret.join(xf) if len(datasets) == 1 else [a.join(b) for a, b in zip(ret, xf)]
 
   if drop_bad:
-    for df in (ret if isinstance(ret, list) else [ret]):
-      drop_bad_fits(df, cut, True)
+    ret = drop_bad_fits(ret, cut, True)
 
   if norm:
     ret = normalize(ret, columns = norm)
