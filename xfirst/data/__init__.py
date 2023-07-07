@@ -137,7 +137,7 @@ def load_tables(
   particles: config.particle_t | Sequence[config.particle_t] = config.particles,
   nshowers: dict[config.dataset_t, int] | int | None = None,
   columns: str | Sequence[str] | None = None,
-) -> pd.DataFrame | list[pd.DataFrame] :
+) -> list[pd.DataFrame] :
   
   tabdir = pathlib.Path(path).resolve()
   pts = [particles] if isinstance(particles, str) else particles
@@ -160,7 +160,7 @@ def load_tables(
         
       ret.append(data)
 
-  return ret if len(ret) > 1 else ret[0]
+  return ret
 
 def load_fits(
   datadir: str | os.PathLike,
@@ -169,43 +169,36 @@ def load_fits(
   particles: config.particle_t | Sequence[config.particle_t] = config.particles,
   nshowers: dict[config.dataset_t, int] | int | None = None,
   columns: str | Sequence[str] | None = None,
-  drop_bad: bool = False,
+  drop_bad: bool | Sequence[bool] = False,
   xfirst: bool = False,
   norm: Sequence[str] | None = None,
-  format: Literal['list', 'dict'] = 'list',
 ) -> pd.DataFrame | list[pd.DataFrame] :
   
   c = config.get_cut(cut)
   p = pathlib.Path(f'{datadir}/fits/range-{c.min_depth}-{c.max_depth}').resolve()
 
   if not p.exists():
-    raise RuntimeError(f'load_fits: fits for cut range [{c.min_depth}, {c.max_depth}] do not exist')
+    raise RuntimeError(f'load_fits: fits for cut {c.name} [{c.min_depth}, {c.max_depth}] do not exist')
   
   ret = load_tables(p, datasets, particles, nshowers, columns)
 
   if xfirst:
-    xf = load_xfirst(datadir, datasets, particles, nshowers)
-    ret = ret.join(xf) if len(datasets) == 1 else [a.join(b) for a, b in zip(ret, xf)]
+    xf = load_tables(f'{datadir}/xfirst', datasets, particles, nshowers, columns)
+    ret = [a.join(b) for a, b in zip(ret, xf)]
 
-  if drop_bad:
-    ret = drop_bad_fits(ret, cut, True)
+  if drop_bad is True:
+    drop_bad_fits(ret, cut, True)
+  elif isinstance(drop_bad, Sequence):
+    for drop, df in zip(drop_bad, ret):
+      if drop is True:
+        drop_bad_fits(df, cut, True)
+      else:
+        df['good'] = good_fits_mask(df, cut)
 
   if norm:
     ret = normalize(ret, columns = norm)
 
-  if format == 'list':
-    return ret
-  elif format == 'dict':
-    if norm:
-      keys = [datasets] if isinstance(datasets, str) else list(datasets)
-      keys += ['mean', 'std']
-      return dict(zip(keys, ret))
-    elif isinstance(datasets, str):
-      return {datasets: ret}
-    else:
-      return dict(zip(datasets, ret))
-  else:
-    raise ValueError(f'load_fits: unsupported format {format}')
+  return ret if len(ret) > 1 else ret[0]
 
 def load_xfirst(
   datadir: str | os.PathLike,
