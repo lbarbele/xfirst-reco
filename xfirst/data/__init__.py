@@ -31,6 +31,8 @@ def good_fits_mask(
   mask &= ~(fits.isna().any(axis = 1))
   mask &= (c.min_depth+10 < fits.Xmax) & (fits.Xmax < c.max_depth-10)
   mask &= (fits > 0).all(axis = 1)
+
+  mask.name = 'good'
   
   return mask
 
