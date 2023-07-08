@@ -2,7 +2,7 @@ import concurrent.futures
 import itertools
 import os
 import pathlib
-from typing import Literal, Sequence
+from typing import Literal, Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -16,43 +16,6 @@ from . import conex
 #
 # data transformations
 #
-
-def good_fits_mask(
-  fits: pd.DataFrame,
-  cut: config.cut_t | str,
-) -> pd.Series:
-  
-  c = config.get_cut(cut)
-
-  fits.replace([np.inf, -np.inf], np.nan, inplace = True)
-  
-  mask = True
-  mask &= (fits.status > 0.99)
-  mask &= ~(fits.isna().any(axis = 1))
-  mask &= (c.min_depth+10 < fits.Xmax) & (fits.Xmax < c.max_depth-10)
-  mask &= (fits > 0).all(axis = 1)
-
-  mask.name = 'good'
-  
-  return mask
-
-def drop_bad_fits(
-  fits: pd.DataFrame | Sequence[pd.DataFrame],
-  cut: config.cut_t | str,
-  inplace: bool = True,
-) -> pd.DataFrame:
-  
-  if isinstance(fits, Sequence):
-    return [drop_bad_fits(frame, cut, inplace) for frame in fits]
-  
-  good = good_fits_mask(fits, cut)
-  idx = fits.index[~good]
-
-  if inplace:
-    fits.drop(idx, inplace = True)
-    return fits
-  else:
-    return fits.drop(idx, inplace = False)
 
 def normalize(datasets, columns: Sequence[str | int]):
   
@@ -93,7 +56,7 @@ def load_profiles(
   datadir: str | os.PathLike,
   datasets: config.dataset_t | Sequence[config.dataset_t] = config.datasets,
   particles: config.particle_t | Sequence[config.particle_t] = config.particles,
-  nshowers: dict[config.dataset_t, int] | None = None,
+  nshowers: Mapping[config.dataset_t, int] | None = None,
   cut: config.cut_t | str | dict | Sequence[float | int] | None = None,
   return_depths: bool = False,
   format: Literal['np', 'pd', 'mm'] = 'np',
@@ -137,7 +100,7 @@ def load_tables(
   path: str | os.PathLike,
   datasets: config.dataset_t | Sequence[config.dataset_t] = config.datasets,
   particles: config.particle_t | Sequence[config.particle_t] = config.particles,
-  nshowers: dict[config.dataset_t, int] | int | None = None,
+  nshowers: Mapping[config.dataset_t, int] | int | None = None,
   columns: str | Sequence[str] | None = None,
 ) -> list[pd.DataFrame] :
   
@@ -166,40 +129,57 @@ def load_tables(
 
 def load_fits(
   datadir: str | os.PathLike,
-  cut: config.cut_t | str | dict | Sequence[float | int],
+  cut: config.cut_t | str,
   datasets: config.dataset_t | Sequence[config.dataset_t] = config.datasets,
   particles: config.particle_t | Sequence[config.particle_t] = config.particles,
-  nshowers: dict[config.dataset_t, int] | int | None = None,
+  nshowers: Mapping[config.dataset_t, int] | int | None = None,
   columns: str | Sequence[str] | None = None,
-  drop_bad: bool | Sequence[bool] = False,
+  drop_bad: Mapping[config.dataset_t, bool] | bool = False,
   xfirst: bool = False,
   norm: Sequence[str] | None = None,
 ) -> pd.DataFrame | list[pd.DataFrame] :
   
   c = config.get_cut(cut)
-  p = pathlib.Path(f'{datadir}/fits/range-{c.min_depth}-{c.max_depth}').resolve()
+  path = pathlib.Path(f'{datadir}/fits/range-{c.min_depth}-{c.max_depth}').resolve()
+  drop = {d: drop_bad for d in config.datasets} if isinstance(drop_bad, bool) else dict(drop_bad)
 
-  if not p.exists():
+  if not path.exists():
     raise RuntimeError(f'load_fits: fits for cut {c.name} [{c.min_depth}, {c.max_depth}] do not exist')
   
-  ret = load_tables(p, datasets, particles, nshowers, columns)
+  ret = load_tables(path, datasets, particles, nshowers, columns)
 
   if xfirst:
-    xf = load_tables(f'{datadir}/xfirst', datasets, particles, nshowers, columns)
-    ret = [a.join(b) for a, b in zip(ret, xf)]
+    xf = load_xfirst(datadir, datasets, particles, nshowers)
+    ret = [a.join(b) for a, b in zip(ret, xf)] if (len(ret) > 1) else [ret[0].join(xf)]
 
-  if drop_bad is True:
-    drop_bad_fits(ret, cut, True)
-  elif isinstance(drop_bad, Sequence):
-    for drop, df in zip(drop_bad, ret):
-      if drop is True:
-        drop_bad_fits(df, cut, True)
+  if any(drop.values()):
+    masks = load_masks(datadir, cut, datasets, particles, nshowers)
+    for d, df, m in zip(datasets, ret, masks if (len(ret) > 1) else [masks]):
+      if drop[d] is True:
+        df.drop(df.index[~m['good']], inplace = True)
       else:
-        df['good'] = good_fits_mask(df, cut)
+        df.insert(len(df.columns), 'good', m)
 
   if norm:
     ret = normalize(ret, columns = norm)
 
+  return ret if len(ret) > 1 else ret[0]
+
+def load_masks(
+  datadir: str | os.PathLike,
+  cut: config.cut_t | str | dict | Sequence[float | int],
+  datasets: config.dataset_t | Sequence[config.dataset_t] = config.datasets,
+  particles: config.particle_t | Sequence[config.particle_t] = config.particles,
+  nshowers: dict[config.dataset_t, int] | int | None = None,
+) -> pd.DataFrame | list[pd.DataFrame]:
+  
+  c = config.get_cut(cut)
+  path = pathlib.Path(f'{datadir}/masks/range-{c.min_depth}-{c.max_depth}').resolve()
+
+  if not path.exists():
+    raise RuntimeError(f'load_masks: masks for cut {c.name} [{c.min_depth}, {c.max_depth}] do not exist')
+  
+  ret = load_tables(path, datasets, particles, nshowers)
   return ret if len(ret) > 1 else ret[0]
 
 def load_xfirst(
@@ -210,7 +190,8 @@ def load_xfirst(
   columns: str | Sequence[str] | None = None,
 ) -> pd.DataFrame | list[pd.DataFrame] :
   
-  return load_tables(f'{datadir}/xfirst', datasets, particles, nshowers, columns)
+  ret = load_tables(f'{datadir}/xfirst', datasets, particles, nshowers, columns)
+  return ret if len(ret) > 1 else ret[0]
 
 #
 # data generation
@@ -229,9 +210,18 @@ def make_selection_masks(
     util.echo(verbose, f'\nprocessing cut configuration {c.name}')
     for d in config.datasets:
       for p in config.particles:
-        data = load_fits(datadir, cut = c, particles = p, datasets = d)
-        mask = good_fits_mask(data, c).to_frame()
-        util.parquet_save(f'{datadir}/masks/range-{c.min_depth}-{c.max_depth}/{d}/{p}', mask, verbose)
+        fits = load_fits(datadir, cut = c, particles = p, datasets = d)
+        fits.replace([np.inf, -np.inf], np.nan, inplace = True)
+
+        mask = True
+        mask &= (fits.status > 0.99)
+        mask &= ~(fits.isna().any(axis = 1))
+        mask &= (c.min_depth+10 < fits.Xmax) & (fits.Xmax < c.max_depth-10)
+        mask &= (fits > 0).all(axis = 1)
+
+        mask = mask.to_frame('good')
+        file = f'{datadir}/masks/range-{c.min_depth}-{c.max_depth}/{d}/{p}'
+        util.parquet_save(file, mask, verbose)
 
 def make_fits(
   datadir: str | os.PathLike,
