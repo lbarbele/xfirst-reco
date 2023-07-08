@@ -211,8 +211,25 @@ def load_xfirst(
   return load_tables(f'{datadir}/xfirst', datasets, particles, nshowers, columns)
 
 #
-# generate fits 
-# 
+# data generation
+#
+
+def make_selection_masks(
+  datadir: str | os.PathLike,
+  cuts: str | config.cut_t | Sequence[str | config.cut_t] = config.cuts,
+  verbose: bool = True,
+) -> None:
+  
+  cs = [config.get_cut(c) for c in cuts] if isinstance(cuts, Sequence) else config.get_cut(cuts)
+  util.echo(verbose, f'generating cut masks for cut configurations {[c.name for c in cs]}')
+
+  for c in cs:
+    util.echo(verbose, f'\nprocessing cut configuration {c.name}')
+    for d in config.datasets:
+      for p in config.particles:
+        data = load_fits(datadir, cut = c, particles = p, datasets = d)
+        mask = good_fits_mask(data, c).to_frame()
+        util.parquet_save(f'{datadir}/masks/range-{c.min_depth}-{c.max_depth}/{d}/{p}', mask, verbose)
 
 def make_fits(
   datadir: str | os.PathLike,
@@ -251,10 +268,6 @@ def make_fits(
         fits = np.concatenate(list(fits))
         fits = pd.DataFrame(fits, columns = fcn().columns, index = pd.Index(range(len(fits)), name = 'id'))
         util.parquet_save(basedir/f'fits/range-{c.min_depth}-{c.max_depth}/{d}/{p}', fits, verbose)
-
-#
-# extract data from conex files 
-#
 
 def make_conex_split(
   datadir: str | os.PathLike,

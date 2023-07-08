@@ -80,3 +80,4 @@ def get_cut(i):
   raise ValueError(f'get_cuts: non existent cut {i}')
 
 cuts = namedtuple('cuts_tuple', [c.name for c in _cuts])(*_cuts)
+cut_names = tuple(c.name for c in cuts)
