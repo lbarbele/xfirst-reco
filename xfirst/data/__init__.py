@@ -71,8 +71,10 @@ def normalize(datasets, columns: Sequence[str | int]):
   
   else:
     raise ValueError('normalize: unsupported input')
+  
+  stats = pd.DataFrame({'mean': means, 'std': stds})
 
-  return [*bs, means, stds]
+  return [*bs, stats]
 
 #
 # dataset loaders
