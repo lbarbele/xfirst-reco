@@ -14,6 +14,32 @@ from .. import profile_functions
 from . import conex
 
 #
+# helper functions
+#
+
+def get_nshowers(input) -> dict[config.dataset_t, int | None]:
+
+  ret = dict.fromkeys(config.datasets, None)
+
+  if isinstance(input, int):
+    if input < 0:
+      raise ValueError(f'get_nshowers: invalid nshowers value {input}')
+    elif input > 0:
+      ret = dict.fromkeys(config.datasets, input)
+  elif isinstance(input, Sequence):
+    ret.update(dict(input))
+  elif isinstance(input, Mapping):
+    ret.update(input)
+  elif input is not None:
+    raise ValueError(f'get_nshowers: invalid input type {type(input)}')
+  
+  for k in ret.keys():
+    if not k in config.datasets:
+      raise ValueError(f'get_nshowers: invalid key {k}')
+
+  return ret
+
+#
 # data transformations
 #
 
@@ -65,7 +91,7 @@ def load_profiles(
   profdir = pathlib.Path(datadir).resolve()/'profiles'
   pts = [particles] if isinstance(particles, str) else particles
   dts = [datasets] if isinstance(datasets, str) else datasets
-  nsh = {} if nshowers is None else dict(nshowers)
+  nsh = get_nshowers(nshowers)
   cut = config.get_cut(cut)
 
   # read depths and determine depth cuts
@@ -107,7 +133,7 @@ def load_tables(
   tabdir = pathlib.Path(path).resolve()
   pts = [particles] if isinstance(particles, str) else particles
   dts = [datasets] if isinstance(datasets, str) else datasets
-  nsh = {d: nshowers for d in config.datasets} if isinstance(nshowers, int | None) else dict(nshowers)
+  nsh = get_nshowers(nshowers)
 
   ret = []
 
@@ -142,23 +168,48 @@ def load_fits(
   c = config.get_cut(cut)
   path = pathlib.Path(f'{datadir}/fits/range-{c.min_depth}-{c.max_depth}').resolve()
   drop = {d: drop_bad for d in config.datasets} if isinstance(drop_bad, bool) else dict(drop_bad)
+  pts = [particles] if isinstance(particles, str) else particles
+  dts = [datasets] if isinstance(datasets, str) else datasets
+  nsh = get_nshowers(nshowers)
 
   if not path.exists():
     raise RuntimeError(f'load_fits: fits for cut {c.name} [{c.min_depth}, {c.max_depth}] do not exist')
   
-  ret = load_tables(path, datasets, particles, nshowers, columns)
+  if any(drop.values()):
+    masks = []
+    for d in dts:
+      if drop.get(d) is True and nsh.get(d) is not None:
+        n = nsh[d]
 
-  if xfirst:
-    xf = load_xfirst(datadir, datasets, particles, nshowers)
+        ms = load_masks(datadir, cut, d, pts)
+        ms = [ms[p] for p in particles]
+        ct = [m[m].index[n] for m in ms]
+        mx = max(ct)
+        ms = [m[:mx] for m in ms]
+
+        for c, m in zip(ct, ms):
+          m[c:] = False
+
+        masks.append(pd.concat(ms, keys = pts))
+        nsh[d] = mx
+
+      else:
+        masks.append(load_masks(datadir, cut, d, pts, nsh))
+  else:
+    masks = None
+
+  ret = load_tables(path, datasets, particles, nsh, columns)
+
+  if xfirst is True:
+    xf = load_xfirst(datadir, datasets, particles, nsh)
     ret = [a.join(b) for a, b in zip(ret, xf)] if (len(ret) > 1) else [ret[0].join(xf)]
 
   if any(drop.values()):
-    masks = load_masks(datadir, cut, datasets, particles, nshowers)
-    for d, df, m in zip(datasets, ret, masks if (len(ret) > 1) else [masks]):
-      if drop[d] is True:
-        df.drop(df.index[~m['good']], inplace = True)
+    for d, df, m in zip(dts, ret, masks):
+      if drop.get(d) is True:
+        df.drop(df.index[~m], inplace = True)
       else:
-        df.insert(len(df.columns), 'good', m)
+        df['good'] = m
 
   if norm:
     ret = normalize(ret, columns = norm)
@@ -180,6 +231,7 @@ def load_masks(
     raise RuntimeError(f'load_masks: masks for cut {c.name} [{c.min_depth}, {c.max_depth}] do not exist')
   
   ret = load_tables(path, datasets, particles, nshowers)
+  ret = [df['good'] for df in ret]
   return ret if len(ret) > 1 else ret[0]
 
 def load_xfirst(
