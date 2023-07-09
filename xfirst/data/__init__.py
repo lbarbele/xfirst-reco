@@ -162,29 +162,73 @@ def load_fits(
   particles: config.particle_t | Sequence[config.particle_t] = config.particles,
   nshowers: Mapping[config.dataset_t, int] | int | None = None,
   columns: str | Sequence[str] | None = None,
-  drop_bad: Mapping[config.dataset_t, bool] | bool = False,
+  drop: Mapping[config.dataset_t, bool] | bool = False,
   xfirst: bool = False,
   norm: Sequence[str] | None = None,
 ) -> pd.DataFrame | list[pd.DataFrame] :
   
   c = config.get_cut(cut)
   path = pathlib.Path(f'{datadir}/fits/range-{c.min_depth}-{c.max_depth}').resolve()
-  drop = {d: drop_bad for d in config.datasets} if isinstance(drop_bad, bool) else dict(drop_bad)
-  pts = [particles] if isinstance(particles, str) else particles
-  dts = [datasets] if isinstance(datasets, str) else datasets
-  nsh = get_nshowers(nshowers)
 
   if not path.exists():
     raise RuntimeError(f'load_fits: fits for cut {c.name} [{c.min_depth}, {c.max_depth}] do not exist')
   
-  if any(drop.values()):
+  if drop is not False:
+    masks = load_masks(datadir, cut, datasets, particles, nshowers, drop)
+    nsh = masks[-1]
+    masks = masks[:-1]
+    dts = [datasets] if isinstance(datasets, str) else datasets
+    drops = len(masks)*[True] if drop is True else [drop.get(d) for d in dts]
+  else:
+    nsh = nshowers
+
+  fits = load_tables(path, datasets, particles, nsh, columns)
+
+  if xfirst is True:
+    xf = load_xfirst(datadir, datasets, particles, nsh)
+    fits = [a.join(b) for a, b in zip(fits, xf)] if (len(fits) > 1) else [fits[0].join(xf)]
+
+  if drop is not False:
+    for f, m, b in zip(fits, masks, drops):
+      if b is True:
+        f.drop(f.index[~m], inplace = True)
+      else:
+        f.insert(len(f.columns), 'good', m)
+
+  if norm:
+    fits = normalize(fits, columns = norm)
+
+  return fits if len(fits) > 1 else fits[0]
+
+def load_masks(
+  datadir: str | os.PathLike,
+  cut: config.cut_t | str | dict | Sequence[float | int],
+  datasets: config.dataset_t | Sequence[config.dataset_t] = config.datasets,
+  particles: config.particle_t | Sequence[config.particle_t] = config.particles,
+  nshowers: dict[config.dataset_t, int] | int | None = None,
+  drop: Mapping[config.dataset_t, bool] | bool = False,
+) -> pd.DataFrame | list[pd.DataFrame]:
+  
+  c = config.get_cut(cut)
+  path = pathlib.Path(f'{datadir}/masks/range-{c.min_depth}-{c.max_depth}').resolve()
+  dts = [datasets] if isinstance(datasets, str) else datasets
+  pts = [particles] if isinstance(particles, str) else particles
+  nsh = get_nshowers(nshowers)
+  dropdict = {d: drop for d in config.datasets} if isinstance(drop, bool) else dict(drop)
+
+  if not path.exists():
+    raise RuntimeError(f'load_masks: masks for cut {c.name} [{c.min_depth}, {c.max_depth}] do not exist')
+
+  if any(dropdict.values()):
+
     masks = []
+
     for d in dts:
       if drop.get(d) is True and nsh.get(d) is not None:
         n = nsh[d]
 
-        ms = load_masks(datadir, cut, d, pts)
-        ms = [ms[p] for p in particles]
+        ms = load_tables(path, d, particles)[0]['good']
+        ms = [ms[p] for p in pts]
         ct = [m[m].index[n] for m in ms]
         mx = max(ct)
         ms = [m[:mx] for m in ms]
@@ -194,47 +238,14 @@ def load_fits(
 
         masks.append(pd.concat(ms, keys = pts))
         nsh[d] = mx
-
       else:
-        masks.append(load_masks(datadir, cut, d, pts, nsh))
+        masks.append(load_tables(path, d, particles, nsh)[0]['good'])
   else:
-    masks = None
 
-  ret = load_tables(path, datasets, particles, nsh, columns)
+    masks = load_tables(path, datasets, particles, nshowers)
+    masks = [df['good'] for df in masks]
 
-  if xfirst is True:
-    xf = load_xfirst(datadir, datasets, particles, nsh)
-    ret = [a.join(b) for a, b in zip(ret, xf)] if (len(ret) > 1) else [ret[0].join(xf)]
-
-  if any(drop.values()):
-    for d, df, m in zip(dts, ret, masks):
-      if drop.get(d) is True:
-        df.drop(df.index[~m], inplace = True)
-      else:
-        df['good'] = m
-
-  if norm:
-    ret = normalize(ret, columns = norm)
-
-  return ret if len(ret) > 1 else ret[0]
-
-def load_masks(
-  datadir: str | os.PathLike,
-  cut: config.cut_t | str | dict | Sequence[float | int],
-  datasets: config.dataset_t | Sequence[config.dataset_t] = config.datasets,
-  particles: config.particle_t | Sequence[config.particle_t] = config.particles,
-  nshowers: dict[config.dataset_t, int] | int | None = None,
-) -> pd.DataFrame | list[pd.DataFrame]:
-  
-  c = config.get_cut(cut)
-  path = pathlib.Path(f'{datadir}/masks/range-{c.min_depth}-{c.max_depth}').resolve()
-
-  if not path.exists():
-    raise RuntimeError(f'load_masks: masks for cut {c.name} [{c.min_depth}, {c.max_depth}] do not exist')
-  
-  ret = load_tables(path, datasets, particles, nshowers)
-  ret = [df['good'] for df in ret]
-  return ret if len(ret) > 1 else ret[0]
+  return [*masks, nsh]
 
 def load_xfirst(
   datadir: str | os.PathLike,
