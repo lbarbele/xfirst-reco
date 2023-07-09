@@ -144,7 +144,7 @@ def split(data, *, indices = None, sizes = None, batches = None, map_sizes = Non
   
   elif indices is not None:
 
-    idx = sorted({i if i > 0 else (len(data) - i) for i in indices})
+    idx = sorted({i if i > 0 else (len(data) + i) for i in indices})
 
     if len(idx) != len(indices):
       raise IndexError('split: repeated indices are not allowed')
