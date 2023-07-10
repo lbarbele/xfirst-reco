@@ -3,11 +3,13 @@ import os
 import pathlib
 from typing import Literal
 
-import matplotlib.axes
-import matplotlib.pyplot
+import matplotlib
 import numpy as np
 import pandas as pd
 import xgboost
+
+from . import util
+from . import viz
 
 # *
 # * model classes
@@ -19,7 +21,7 @@ class model(abc.ABC):
     ...
 
   @abc.abstractmethod
-  def fit(self, train, validation):
+  def fit(self, train, validation, verbose):
     ...
 
   @abc.abstractmethod
@@ -27,8 +29,17 @@ class model(abc.ABC):
     ...
 
   @abc.abstractmethod
-  def save(self, path: str | os.PathLike) -> None:
-    ...
+  def save(self, path: str | os.PathLike) -> pathlib.Path:
+    
+    # create output directory
+    outdir = pathlib.Path(path).resolve()
+    os.makedirs(outdir, exist_ok = True)
+
+    # save the validation curve
+    self.draw().savefig(outdir/'validation_curve.pdf')
+
+    # return path object
+    return outdir
 
   def test(self, x, y, format: Literal['np', 'pd'] = 'pd'):
     
@@ -58,13 +69,14 @@ class gradient_boosting_regressor(model):
 
     self._xgb = xgboost.XGBRegressor(**kwargs)
 
-  def draw(self, ax: matplotlib.axes.Axes | None = None) -> matplotlib.axes.Axes:
+  def draw(self, ax: matplotlib.axes.Axes | None = None) -> matplotlib.figure.Figure:
     ytrain = self.xgb.evals_result()['validation_0']['rmse']
     yval = self.xgb.evals_result()['validation_1']['rmse']
     x = np.arange(len(ytrain)) + 1
 
     if ax is None:
-      ax = matplotlib.pyplot.gca()
+      fig = matplotlib.pyplot.figure()
+      ax = fig.gca()
 
     ax.plot(x, yval, '-', label = 'Validation', color = 'navy', alpha = 0.7)
     ax.plot(x, ytrain, '--', label = 'Train', color = 'orange')
@@ -72,19 +84,20 @@ class gradient_boosting_regressor(model):
     ax.set_ylabel('Root mean squared error')
     ax.set_xlabel('$n_\mathrm{trees}$')
 
-    return ax
+    return ax.figure
 
-  def fit(self, train: tuple, validation: tuple):
-    self.xgb.fit(X = train[0], y = train[1], eval_set = [train, validation], verbose = True)
+  def fit(self, train: tuple, validation: tuple, verbose: bool = True) -> model:
+    self.xgb.fit(X = train[0], y = train[1], eval_set = [train, validation], verbose = verbose)
     return self
   
   def predict(self, x):
     return self.xgb.predict(X = x)
   
-  def save(self, path: str | os.PathLike):
-    p = pathlib.Path(path).resolve()
-    os.makedirs(p.parent, exist_ok = True)
-    self.xgb.save_model(p.with_suffix('.ubj'))
+  def save(self, path: str | os.PathLike) -> pathlib.Path:
+    
+    p = super().save(path)
+    self.xgb.save_model(p/'model.ubj')
+    return p
 
   @property
   def xgb(self):

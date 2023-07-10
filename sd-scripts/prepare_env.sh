@@ -29,13 +29,20 @@ export BASE_DIR="${HOME_DIR}/ml-conex-xfirst"
 
 export LOGS_DIR="${HOME_DIR}/joblogs/ml-conex-xfirst"
 export DATA_DIR="${BASE_DIR}/data"
+export MODELS_DIR="${BASE_DIR}/models"
 export SCRIPTS_DIR="${BASE_DIR}/scripts"
 
-# number of showers to use
+# number of showers to load from conex files
 
 export MAX_TRAIN=1800000
 export MAX_VAL=1800000
 export MAX_TEST=400000
+
+# number of showers to use on traning and evaluation
+
+export NTRAIN=1000000
+export NVAL=1000000
+export NTEST=300000
 
 # rename job
 

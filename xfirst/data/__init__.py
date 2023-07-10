@@ -224,7 +224,7 @@ def load_masks(
     masks = []
 
     for d in dts:
-      if drop.get(d) is True and nsh.get(d) is not None:
+      if dropdict.get(d) is True and nsh.get(d) is not None:
         n = nsh[d]
 
         ms = load_tables(path, d, particles)[0]['good']
