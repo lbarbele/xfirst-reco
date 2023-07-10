@@ -1,6 +1,5 @@
 from collections.abc import Sequence
 import itertools
-import glob
 import json
 import os
 import pathlib
@@ -9,37 +8,17 @@ from typing import overload, Any, Iterable, Mapping
 import numpy as np
 import pandas as pd
 
-def as_list(input, check_empty: bool = True) -> list:
+# *
+# * misc
+# *
 
-  ret = input if isinstance(input, list) else [input]
+def collapse(input: Mapping[Any, Any]) -> Mapping[Any, Any] | Any:
 
-  if check_empty and len(ret) == 0:
-    raise RuntimeError('as_list: list is empty')
-  
-  return ret
-
-def df_from_dict(
-  datadict: dict[str, np.ndarray],
-  keys: list[str] | None = None,
-  columns: list[str] | None = None,
-  index_name: str = 'id',
-) -> pd.DataFrame:
-  
-  if keys is None:
-    keys = list(datadict.keys())
-
-  dfs = []
-
-  for k in keys:
-    data = datadict[k]
-    index = pd.Index(range(len(data)), name = index_name)
-    dfs.append(pd.DataFrame(data, columns = columns, copy = False, index = index))
-
-  return pd.concat(dfs, keys = keys)
+  return input if len(input) > 1 else next(iter(input.values()))
 
 def echo(verbose: bool, msg) -> None:
-  if verbose:
-    print(msg)
+
+  if verbose: print(msg)
   
 def get_range(values: np.ndarray, min_value: float | None = None, max_value: float | None = None) -> tuple[int | None, int | None]:
 
@@ -60,47 +39,19 @@ def get_range(values: np.ndarray, min_value: float | None = None, max_value: flo
     
     iright = (values < max_value).argmin()
   
-  return ileft, iright
+  return slice(ileft, iright)
 
-def json_dump(data: dict, path: str) -> None:
+def strlist(input: str | Sequence[str] | None) -> list[str] | None:
 
-  p = pathlib.Path(path).resolve()
-  os.makedirs(p.parent, exist_ok = True)
-  with open(p, 'w') as f:
-    f.write(json.dumps(data, indent = 2))
+  if input is None:
+    return None
 
-def json_load(path: str) -> dict:
+  l = list(input.split(',') if isinstance(input, str) else input)
 
-  with open(path, 'r') as f:
-    data = json.load(f)
+  if len(set(l)) != len(l):
+    raise ValueError('strset: repeated values are not allowed')
 
-  return data
-
-def np_save(path: str | os.PathLike, data: np.ndarray, verbose: bool = False) -> None:
-
-  f = pathlib.Path(path).resolve().with_suffix('.npy')
-  os.makedirs(f.parent, exist_ok = True)
-  np.save(f, data)
-
-  echo(verbose, f'+ npy saved to {f}')
-
-def parquet_load(path: str, nrows: int | None = None, columns: list[str] | None = None) -> pd.DataFrame:
-
-  p = pathlib.Path(path).resolve().with_suffix('.parquet')
-  d = pd.read_parquet(p, columns = columns)
-
-  if nrows is not None:
-    d.drop(d.index[nrows:], inplace = True)
-
-  return d
-
-def parquet_save(path: str | os.PathLike, data: pd.DataFrame, verbose: bool = False) -> None:
-
-  p = pathlib.Path(path).resolve().with_suffix('.parquet')
-  os.makedirs(p.parent, exist_ok = True)
-  data.to_parquet(p)
-
-  echo(verbose, f'+ parquet file saved to {p}')
+  return l
 
 @overload
 def split(data: Sequence[Any], *, indices: Iterable[int]) -> list[Sequence[Any]]:
@@ -161,3 +112,70 @@ def split(data, *, indices = None, sizes = None, batches = None, map_sizes = Non
     return dict(zip(map_sizes.keys(), split(data, sizes = map_sizes.values())))
 
   raise RuntimeError('split: unexpected error')
+
+# *
+# * io
+# *
+
+def hdf_save(path: str | os.PathLike, data: pd.DataFrame, key: str, verbose: bool = False) -> None:
+
+  p = pathlib.Path(path).resolve().with_suffix('.h5')
+  os.makedirs(p.parent, exist_ok = True)
+  data.to_hdf(p, key = key, complevel = 1, append = True, format = 'table', data_columns = True)
+
+  echo(verbose, f'+ hdf key "{key}" saved to {p}')
+
+def hdf_load(path: str | os.PathLike, key: str | Sequence[str], nrows: int | None = None, columns: str | Sequence[str] | None = None) -> pd.DataFrame:
+
+  file = pathlib.Path(path).resolve().with_suffix('.h5')
+  cols = strlist(columns)
+  keys = strlist(key)
+
+  if len(keys) == 1:
+    return pd.read_hdf(file, key = keys[0], stop = nrows, columns = cols)
+  else:
+    data = [pd.read_hdf(file, key = k, stop = nrows, columns = cols) for k in keys]
+    data = pd.concat(data, keys = keys, copy = False)
+    return data
+
+def json_save(data: dict, path: str, verbose: bool = False) -> None:
+
+  p = pathlib.Path(path).resolve()
+  os.makedirs(p.parent, exist_ok = True)
+  with open(p, 'w') as f:
+    f.write(json.dumps(data, indent = 2))
+
+  echo(verbose, f'+ json saved to {p}\n')
+
+def json_load(path: str) -> dict:
+
+  with open(path, 'r') as f:
+    data = json.load(f)
+
+  return data
+
+def np_save(path: str | os.PathLike, data: np.ndarray, verbose: bool = False) -> None:
+
+  f = pathlib.Path(path).resolve().with_suffix('.npy')
+  os.makedirs(f.parent, exist_ok = True)
+  np.save(f, data)
+
+  echo(verbose, f'+ npy saved to {f}')
+
+def parquet_load(path: str, nrows: int | None = None, columns: list[str] | None = None) -> pd.DataFrame:
+
+  p = pathlib.Path(path).resolve().with_suffix('.parquet')
+  d = pd.read_parquet(p, columns = columns)
+
+  if nrows is not None:
+    d.drop(d.index[nrows:], inplace = True)
+
+  return d
+
+def parquet_save(path: str | os.PathLike, data: pd.DataFrame, verbose: bool = False) -> None:
+
+  p = pathlib.Path(path).resolve().with_suffix('.parquet')
+  os.makedirs(p.parent, exist_ok = True)
+  data.to_parquet(p)
+
+  echo(verbose, f'+ parquet file saved to {p}')

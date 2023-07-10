@@ -1,10 +1,11 @@
 import abc
 import inspect
+import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from scipy.optimize import curve_fit
+import scipy
 
 # *
 # * virtual interface
@@ -120,51 +121,51 @@ class profile_function(abc.ABC):
 
   def fit(self, x: np.ndarray, y: np.ndarray, concat: bool = False) -> list | np.ndarray:
 
-    # number of degrees of freedom
-    self._ndf = len(x) - self.npar
+    # scipy requires float64 for x and y and initial guess p0
+    xf = np.asarray(x, dtype = np.float64)
+    yf = np.asarray(y, dtype = np.float64)
+    p0 = self.guess(xf, yf)
+    # poissonian ansatz of https://arxiv.org/abs/1111.0504, but without cutting the profiles
+    sf = np.sqrt((1e-1*np.sum(yf))*yf)
 
-    # scipy requires float64 for x and y and p0
-    xf = x if x.dtype >= np.float64 else np.array(x, dtype = np.float64)
-    yf = y if y.dtype >= np.float64 else np.array(y, dtype = np.float64)
+    with warnings.catch_warnings():
+      # curve fit may give an OptimizeWarning which is treated as an error here
+      warnings.filterwarnings('error')
 
-    try:
-      # poissonian ansatz as in https://arxiv.org/abs/1111.0504, but without cutting the profiles
-      s = 1e-2*np.sqrt(yf*np.sum(yf))
-      p0 = self.guess(xf, yf)
-      popt, pcov, info, mesg, ierr = curve_fit(self, xf, yf, p0, s, full_output = True)
-      self._params = popt
-      self._fit_status = (1 <= ierr and ierr <= 4)
-      self._errors = np.sqrt(pcov.diagonal()) if self._fit_status else np.zeros(self.npar, dtype = np.float32)
-      self._chi2 = np.sum(((yf - self(xf, *popt)) / s)**2)
-      self._fitted_data = (x, y)
+      try:
+        popt, pcov, info, mesg, ierr = scipy.optimize.curve_fit(self, xf, yf, p0, sf, full_output = True)
 
-      self.fit_callback()
-      
-      if concat:
-        return np.concatenate([popt, self._errors, [self._fit_status, self._chi2, self._ndf]], dtype = np.float32)
-      else:
-        return popt, self._errors, self._fit_status, self._chi2, self._ndf
-    except:
-      if concat:
-        return np.zeros(2*self.npar + 3, dtype = np.float32)
-      else:
-        return self.guess(x, y), self.guess(x, y), 0., 0., 0.
+        # copy fit information
+        self._params = popt
+        self._fit_status = (1 <= ierr and ierr <= 4)
+        self._errors = np.sqrt(pcov.diagonal()) if (self._fit_status is True) else np.zeros(self.npar)
+        self._chi2 = np.sum(((yf - self(xf, *popt)) / sf)**2)
+        self._ndf = len(x) - self.npar
+        self._fitted_data = (x, y)
+
+        self.fit_callback()
+
+      except:
+        self._params = np.zeros(self.npar, dtype = np.float32)
+        self._errors = np.zeros(self.npar, dtype = np.float32)
+        self._fit_status = False
+        self._chi2 = 0
+        self._ndf = 0
+
+    if concat:
+      return np.concatenate([self.parameters, self.errors, [self.fit_status, self.chi2, self.ndf]], dtype = np.float64)
+    else:
+      return self.parameters, self.errors, self.fit_status, self.chi2, self.ndf
       
   def fit_callback(self):
     pass
       
-  def get_fits(self, x, y = None, format: str = 'np') -> np.ndarray | pd.DataFrame:
+  def get_fits(self, x, y = None) -> pd.DataFrame:
 
-    iter = x if y is None else zip(x, y)
-    data = [self.fit(xi, yi, concat = True) for xi, yi in iter]
-
-    if format == 'np':
-      return np.array(data, dtype = np.float32)
-    elif format == 'pd':
-      idx = pd.Index(range(len(data)), name = 'id')
-      return pd.DataFrame(data, columns = self.columns, index = idx)
-    else:
-      raise RuntimeError(f'parser.get_table: invalid format {format}')
+    data = x if y is None else zip(x, y)
+    fits = [self.fit(xi, yi, True) for xi, yi in data]
+    fits = pd.DataFrame(fits, columns = self.columns)
+    return fits
 
 # *
 # * implementations
@@ -177,9 +178,8 @@ class usp(profile_function, function_name = 'usp'):
   parameters is less correlated and without large tails.
   """
   def __call__(self, x, lgNmax, Xmax, L, R) -> float | np.ndarray:
-    absr = np.abs(R)
-    z = np.maximum(1 + (absr/L) * (x - Xmax), 1e-5)
-    return np.exp(lgNmax + (1 + np.log(z) - z) / absr**2)
+    z = np.maximum(1 + (np.abs(R)/L) * (x - Xmax), 1e-5)
+    return np.exp(lgNmax + (1 + np.log(z) - z) / R**2)
   
   def fit_callback(self):
     self._params[3] = np.abs(self._params[3])

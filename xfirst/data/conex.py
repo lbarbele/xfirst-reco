@@ -118,7 +118,7 @@ class parser:
     else:
       raise RuntimeError(f'parser.add_special_branch: invalid branch {branch_name}')
       
-  def get_table(self, format: str = 'np') -> np.ndarray | pd.DataFrame:
+  def get_table(self) -> pd.DataFrame:
     
     data = np.zeros(shape = (self.nshowers, len(self.columns)), dtype = np.float32)
     
@@ -126,13 +126,8 @@ class parser:
       self.read(i)
       np.concatenate(self._row_data, out = data[i])
 
-    if format == 'np':
-      return data
-    elif format == 'pd':
-      idx = pd.Index(range(self.nshowers), name = 'id')
-      return pd.DataFrame(data, columns = self.columns, copy = False, index = idx)
-    else:
-      raise RuntimeError(f'parser.get_table: invalid format {format}')
+    idx = pd.Index(range(self.nshowers), name = 'id')
+    return pd.DataFrame(data, columns = self.columns, copy = False, index = idx)
       
   def read(self, entry: int) -> None:
 
