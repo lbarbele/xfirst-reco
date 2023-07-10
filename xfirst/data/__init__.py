@@ -1,5 +1,3 @@
-import concurrent.futures
-import itertools
 import os
 import pathlib
 from typing import Literal, Mapping, Sequence
@@ -9,7 +7,6 @@ import pandas as pd
 
 from .. import config
 from .. import util
-from .. import profile_functions
 
 from . import conex
 
