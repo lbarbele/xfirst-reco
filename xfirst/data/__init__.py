@@ -92,6 +92,7 @@ def load_fits(
   columns: str | Sequence[str] | None = None,
   xfirst: bool = False,
   norm: str | Sequence[str] | None = None,
+  drop_bad: bool = False,
 ) -> pd.DataFrame | dict[pd.DataFrame]:
   
   cutrange = config.get_cut(cut)
@@ -102,6 +103,10 @@ def load_fits(
   if xfirst is True:
     xfdata = {d: util.hdf_load(f'{datadir}/xfirst/{d}', key = particles, columns = columns) for d in util.strlist(datasets)}
     fits = {d: fits[d].join(xfdata[d]) for d in util.strlist(datasets)}
+
+  if drop_bad is True:
+    for df in fits.values():
+      df.drop(df.index[df.status < 0.99], inplace = True)
 
   if norm is not None:
     fits = normalize(fits, norm)
