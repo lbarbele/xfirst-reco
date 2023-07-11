@@ -1,5 +1,6 @@
 import abc
 import inspect
+from typing import Iterable
 import warnings
 
 import matplotlib.pyplot as plt
@@ -160,7 +161,7 @@ class profile_function(abc.ABC):
   def fit_callback(self):
     pass
       
-  def get_fits(self, x, y = None) -> pd.DataFrame:
+  def get_fits(self, x: Iterable, y: Iterable | None = None) -> pd.DataFrame:
 
     data = x if y is None else zip(x, y)
     fits = [self.fit(xi, yi, True) for xi, yi in data]

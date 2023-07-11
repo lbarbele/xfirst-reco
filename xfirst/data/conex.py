@@ -1,67 +1,91 @@
 import os
-from typing import Iterable
+from typing import Iterable, Sequence
 
 import numpy as np
 import pandas as pd
 import ROOT
 
+from .. import util
+
 def get_conex_tree(
   files: str | os.PathLike | Iterable[str | os.PathLike],
   tree_name: str,
-  entries: int | None = None
+  entries: int | None = None,
+  filter: str = None,
 ) -> ROOT.TChain:
   
-  fls = iter([str(files)]) if isinstance(files, str | os.PathLike) else map(str, files)
-  ret = ROOT.TChain(tree_name, tree_name)
+  filesiter = map(str, [files] if isinstance(files, str | os.PathLike) else files)
+  chain = ROOT.TChain(tree_name, tree_name)
 
-  if entries is not None:
+  count = 0
 
-    if entries <= 0:
-      raise ValueError(f'get_conex_tree: invalid entries parameter {entries}')
-    
-    while entries > ret.GetEntries():
-      try:
-        ret.Add(next(fls))
-      except StopIteration:
-        raise RuntimeError(f'get_conex_tree: requested more entries ({entries}) than available ({ret.GetEntries()})')
-      
-  else:
-    for f in fls:
-      ret.Add(f)
+  for f in filesiter:
+    chain.Add(f)
 
-  return ret
+    if entries is not None:
+      with ROOT.TFile(f) as rootfile:
+        tree = rootfile.Get(tree_name)
+        count += tree.GetEntries() if filter is None else tree.GetEntries(filter)
+
+      if count >= entries:
+        break
+
+  if entries is not None and count < entries:
+    raise RuntimeError(f'get_conex_tree: requested more entries ({entries}) than available ({count})')
+  
+  chain.Draw('>>selector', filter or '')
+  selector = ROOT.TEventList(ROOT.gDirectory.selector)
+
+  if entries is not None and count > entries:
+    excess = ROOT.TEventList()
+    for i in range(entries, selector.GetN()):
+      excess.Enter(selector.GetEntry(i))
+    selector.Subtract(excess)
+  
+  chain.SetEventList(selector)
+
+  return chain
+
+def get_event_list(tree: ROOT.TTree | ROOT.TChain):
+
+  eventlist = tree.GetEventList()
+  buffer = eventlist.GetList()
+  count = eventlist.GetN()
+
+  return np.frombuffer(buffer, dtype = np.int64, count = count)
 
 class parser:
 
   def __init__(
     self,
-    files: str | list[str],
-    branches: list[str],
+    files: str | os.PathLike | Iterable[str | os.PathLike],
+    branches: str | Sequence[str] | None = None,
     nshowers: int | None = None,
-    concat: bool = False
+    concat: bool = False,
+    filter: str | None = None,
   ) -> None:
 
-    self._branches = branches
-    self._tree = get_conex_tree(files, 'Shower', nshowers)
+    self._tree = get_conex_tree(files, 'Shower', nshowers, filter)
     self._files = [f.GetTitle() for f in self.tree.GetListOfFiles()]
-    self._nshowers = self.tree.GetEntries() if nshowers is None else nshowers
+    self._eventlist = get_event_list(self._tree)
+    self._nshowers = len(self._eventlist)
+    self._branches = util.strlist(branches) or []
     self._data = {}
-    self._updaters = []
     self._concat = concat
     self._current = 0
 
     self._nX = np.zeros(1, np.int32)
     self.tree.SetBranchAddress('nX', self._nX)
-    self.tree.GetEntry(0)
+    self.read(0)
 
-    for branch_name in branches:
+    for branch_name in self.branches:
       if branch_name in ['Xdep', 'Edep']:
         self.add_special_branch(branch_name)
       else:
         self.add_branch(branch_name)
 
     # form a row of data
-    row = [self.data[br] for br in branches]
+    row = [self.data[br] for br in self.branches]
     self._row_data = row
     self._row = np.concatenate(row).astype(np.float32) if concat else row
 
@@ -69,7 +93,7 @@ class parser:
     self._columns = []
     for i, v in enumerate(row):
       l = len(v)
-      b = branches[i]
+      b = self.branches[i]
       self._columns += [b] if (l == 1) else [f'{b}_{j}' for j in range(l)]
 
   # methods
@@ -131,7 +155,7 @@ class parser:
       
   def read(self, entry: int) -> None:
 
-    self.tree.GetEntry(entry)
+    self.tree.GetEntry(self.eventlist[entry])
 
   # element access and iteration
 
@@ -173,6 +197,10 @@ class parser:
   @property
   def data(self):
     return self._data
+  
+  @property
+  def eventlist(self):
+    return self._eventlist
   
   @property
   def files(self):
