@@ -12,6 +12,7 @@ import xfirst.util as util
 def make_conex_split(
   datadir: str | os.PathLike,
   nshowers: Mapping[config.dataset_t, int],
+  filter: str | None = None,
   verbose: bool = True,
 ) -> dict[config.dataset_t, dict[config.particle_t, list[str]]]:
   """
@@ -35,6 +36,11 @@ def make_conex_split(
     test) and the values are the corresponding number of showers requested for the
     datasets. All three datasets must be present.
 
+  filter: str
+    a string describing a filter to apply when parsing the CONEX tree. Any selection
+    string valid as a selector for root's TTree::Draw is a valid filter. Effectively,
+    a filter will affect the number of showers read from each file.
+
   verbose : bool, default True
     if true, information will be printed as data is processed.
 
@@ -53,10 +59,11 @@ def make_conex_split(
   
   for p in config.particles:
     files = set(map(str, basedir.glob(f'conex/{p}*/**/*.root')))
-    util.echo(verbose, f'+ {len(files)} files found under {basedir}/conex/{p}*/**/*.root')
+    util.echo(verbose, f'+ {len(files)} files found under {basedir}/conex/{p}*/**/*.root, of which')
     for d in config.datasets:
-      ret[d][p] = conex.parser(files, [], nshowers[d]).files
+      ret[d][p] = conex.parser(files = files, nshowers = nshowers[d], filter = filter).files
       files -= set(ret[d][p])
+      util.echo(verbose, f'  {len(ret[d][p])} {d} files')
 
   util.json_save(ret, basedir/'conex.json', verbose)
 
@@ -65,6 +72,7 @@ def make_conex_split(
 def make_datasets(
   datadir: str | os.PathLike,
   nshowers: Mapping[config.dataset_t, int],
+  filter: str | None = None,
   verbose: bool = True,
 ) -> None:
   """
@@ -96,6 +104,10 @@ def make_datasets(
     test) and the values are the corresponding number of showers requested for the
     datasets. All three datasets must be present.
 
+  filter: str
+    a string describing a filter to apply when parsing the CONEX tree. Any selection
+    string valid as a selector for root's TTree::Draw is a valid filter.
+
   verbose : bool, default True
     if true, information will be printed as data is processed.
 
@@ -109,12 +121,12 @@ def make_datasets(
   nsh = dict(nshowers)
 
   # split conex files
-  cxpaths = make_conex_split(basedir, nsh)
+  cxpaths = make_conex_split(basedir, nsh, filter, verbose)
 
   # profiles
   util.echo(verbose, 'generating profile datasets')
   for d, p in itertools.product(config.datasets, config.particles):
-    data = conex.parser(files = cxpaths[d][p], branches = ['Edep'], nshowers = nsh[d], concat = True).get_table()
+    data = conex.parser(files = cxpaths[d][p], branches = ['Edep'], nshowers = nsh[d], concat = True, filter = filter).get_table()
     util.hdf_save(basedir/'profiles'/d, data, p, verbose)
 
   # depths
@@ -125,12 +137,13 @@ def make_datasets(
   # xfirst
   util.echo(verbose, '\ngenerating xfirst datasets')
   for d, p in itertools.product(config.datasets, config.particles):
-    data = conex.parser(files = cxpaths[d][p], branches = branches, nshowers = nsh[d], concat = True).get_table()
+    data = conex.parser(files = cxpaths[d][p], branches = branches, nshowers = nsh[d], concat = True, filter = filter).get_table()
     util.hdf_save(basedir/'xfirst'/d, data, p, verbose)
 
 @click.command()
 @click.option('--datadir', type = click.Path(exists = True, dir_okay = True), required = True)
 @click.option('--nshowers', type = (str, click.IntRange(1, 4000000)), required = True, multiple = True)
+@click.option('--filter', type = str, required = False, default = None)
 @click.option('--verbose/--no-verbose', default = True)
 def main(**kwargs):
   make_datasets(**kwargs)
