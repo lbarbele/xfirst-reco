@@ -46,9 +46,9 @@ export LOAD_FILTER='lgE >= 18'
 
 # number of showers to load from conex files
 
-export LOAD_TRAIN=1606308
-export LOAD_VAL=1606308
-export LOAD_TEST=803154
+export LOAD_TRAIN=1071000
+export LOAD_VAL=1071000
+export LOAD_TEST=536000
 
 # number of showers to use on traning and evaluation
 
