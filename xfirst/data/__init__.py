@@ -102,8 +102,11 @@ def load_fits(
     fits = {d: fits[d].join(xfdata[d]) for d in util.strlist(datasets)}
 
   if drop_bad is True:
-    for df in fits.values():
-      df.drop(df.index[df.status < 0.99], inplace = True)
+    for d in util.strlist(datasets):
+      bad = util.hdf_load(f'{path}/{d}', key = util.strlist(particles), columns = 'status')
+      bad = bad.status < 0.99
+      bad = bad.index[bad]
+      fits[d].drop(bad, inplace = True)
 
   if norm is not None:
     fits = normalize(fits, norm)
