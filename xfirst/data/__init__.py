@@ -98,7 +98,7 @@ def load_fits(
   fits = {d: util.hdf_load(f'{path}/{d}', key = util.strlist(particles), columns = columns) for d in util.strlist(datasets)}
 
   if xfirst is True:
-    xfdata = {d: util.hdf_load(f'{datadir}/xfirst/{d}', key = particles, columns = columns) for d in util.strlist(datasets)}
+    xfdata = {d: util.hdf_load(f'{datadir}/xfirst/{d}', key = particles) for d in util.strlist(datasets)}
     fits = {d: fits[d].join(xfdata[d]) for d in util.strlist(datasets)}
 
   if drop_bad is True:
