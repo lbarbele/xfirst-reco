@@ -14,9 +14,10 @@ source /scratch/astroparti/luan.arbeletche/ml-conex-xfirst/sd-scripts/prepare_en
 
 python "${SCRIPTS_DIR}/make_datasets.py" \
   --datadir "${DATA_DIR}" \
-  --nshowers train "${MAX_TRAIN}" \
-  --nshowers validation "${MAX_VAL}" \
-  --nshowers test "${MAX_TEST}"
+  --nshowers train "${LOAD_TRAIN}" \
+  --nshowers validation "${LOAD_VAL}" \
+  --nshowers test "${LOAD_TEST}" \
+  --filter "${LOAD_FILTER}"
 
 python "${SCRIPTS_DIR}/make_fits.py" \
   --datadir "${DATA_DIR}" \
