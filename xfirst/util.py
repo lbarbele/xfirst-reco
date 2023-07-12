@@ -1,9 +1,8 @@
-from collections.abc import Sequence
 import itertools
 import json
 import os
 import pathlib
-from typing import overload, Any, Iterable, Mapping
+from typing import overload, Any, Iterable, Mapping, Sequence
 
 import numpy as np
 import pandas as pd
