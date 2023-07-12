@@ -2,6 +2,7 @@ import itertools
 import json
 import os
 import pathlib
+import sys
 from typing import overload, Any, Iterable, Mapping, Sequence
 
 import numpy as np
@@ -39,6 +40,9 @@ def get_range(values: np.ndarray, min_value: float | None = None, max_value: flo
     iright = (values < max_value).argmin()
   
   return slice(ileft, iright)
+
+def interactive():
+  return hasattr(sys, 'ps1') or hasattr(sys, 'ps2')
 
 def strlist(input: str | Sequence[str] | None) -> list[str] | None:
 
@@ -139,12 +143,12 @@ def hdf_load(path: str | os.PathLike, key: str | Sequence[str], nrows: int | Non
 
 def json_save(data: dict, path: str, verbose: bool = False) -> None:
 
-  p = pathlib.Path(path).resolve()
+  p = pathlib.Path(path).resolve().with_suffix('.json')
   os.makedirs(p.parent, exist_ok = True)
   with open(p, 'w') as f:
     f.write(json.dumps(data, indent = 2))
 
-  echo(verbose, f'+ json saved to {p}\n')
+  echo(verbose, f'+ json saved to {p}')
 
 def json_load(path: str) -> dict:
 
