@@ -2,11 +2,16 @@ import os
 import pathlib
 import typing
 
+import pandas as pd
+
 dataset_t = typing.Literal['train', 'validation', 'test']
 datasets = typing.get_args(dataset_t)
 
 particle_t = typing.Literal['p', 'He', 'C', 'Si', 'Fe']
 particles = typing.get_args(particle_t)
+
+datadict_t = typing.Mapping[dataset_t | typing.Literal['normalization'], pd.DataFrame]
+path_t = str | os.PathLike
 
 class cut():
   _cuts = {

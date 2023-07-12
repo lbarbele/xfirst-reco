@@ -1,7 +1,7 @@
 import abc
 import os
 import pathlib
-from typing import Iterable, Literal, Mapping, Self, Sequence
+from typing import Iterable, Self, Sequence
 
 import keras
 import keras.callbacks
@@ -27,10 +27,13 @@ class model(abc.ABC):
     verbose: bool = False,
   ) -> None:
     
+    self._cfg = {}
     self._features = None
+    self._history = None
     self._target = None
     self._verbose = verbose
-    self._cfg = {}
+
+  # properties: common to all models
 
   @property
   def cfg(self):
@@ -41,6 +44,10 @@ class model(abc.ABC):
     return self._features
   
   @property
+  def history(self):
+    return self._history
+  
+  @property
   def target(self):
     return self._target
 
@@ -48,19 +55,24 @@ class model(abc.ABC):
   def verbose(self):
     return self._verbose
   
-  # draw validation curve
+  # abstract methods: require implementation
 
   @abc.abstractmethod
-  def _draw(
-    self,
-    ax: matplotlib.axes.Axes
-  ) -> None:
+  def _fit(self, train: tuple[pd.DataFrame, pd.Series], validation: tuple[pd.DataFrame, pd.Series]) -> dict:
     ...
 
-  def draw(
-    self,
-    ax: matplotlib.axes.Axes | None = None
-  ) -> matplotlib.figure.Figure:
+  @abc.abstractmethod
+  def _predict(self, x: pd.DataFrame) -> np.ndarray:
+    ...
+
+  @abc.abstractmethod
+  def _save(self, path: pathlib.Path) -> pathlib.Path:
+    ...
+
+  # model interface methods: common to all models
+
+  # draw validation curve
+  def draw(self, ax: matplotlib.axes.Axes | None = None) -> matplotlib.figure.Figure:
 
     if ax is None:
       fig = matplotlib.pyplot.figure()
@@ -68,18 +80,16 @@ class model(abc.ABC):
     else:
       fig = ax.figure
     
-    self._draw(ax)
+    ax.plot(self.history['x'], self.history['val_loss'], '-', label = 'Validation', c = 'navy', alpha = 0.7)
+    ax.plot(self.history['x'], self.history['loss'], '--', label = 'Train', c = 'orange')
+    ax.legend()
+    ax.set_ylabel('RMS error')
+    ax.set_xlabel(self.history['xlabel'])
 
     return fig
   
-  # evaluate model, plot, optionally save
-
-  def eval(
-    self,
-    data: Mapping[config.dataset_t | Literal['normalization'], pd.DataFrame], 
-    save: str | os.PathLike | None = None,
-    plot: bool = False,
-  ) -> pd.DataFrame:
+  # evaluate model, optionally plot, optionally save
+  def eval( self, data: config.datadict_t, save: config.path_t | None = None, plot: bool = False) -> pd.DataFrame:
 
     # compute predictions
     results = {}
@@ -107,27 +117,14 @@ class model(abc.ABC):
       if plot is True:
         fig.savefig(outdir/'predictions.pdf')
       # save normalization
-      norm = data['normalization']
-      util.hdf_save(outdir/'normalization', data = norm, key = 'normalization', verbose = self.verbose)
+      if 'normalization' in data:
+        norm = data['normalization']
+        util.hdf_save(outdir/'normalization', data = norm, key = 'normalization', verbose = self.verbose)
 
     return results
 
   # fit model
-
-  @abc.abstractmethod
-  def _fit(
-    self,
-    train: tuple[pd.DataFrame, pd.Series],
-    validation: tuple[pd.DataFrame, pd.Series],
-  ) -> None:
-    ...
-
-  def fit(
-    self,
-    data: Mapping[config.dataset_t, pd.DataFrame],
-    x: str | Sequence[str],
-    y: str,
-  ) -> Self:
+  def fit(self, data: config.datadict_t, x: str | Sequence[str], y: str) -> Self:
     
     self._features = x
     self._target = y
@@ -139,23 +136,12 @@ class model(abc.ABC):
 
     train = (data['train'][x], data['train'][y])
     valid = (data['validation'][x], data['validation'][y])
-    self._fit(train, valid)
+    self._history = self._fit(train, valid)
 
     return self
   
   # predict on test data
-
-  @abc.abstractmethod
-  def _predict(
-    self,
-    x: pd.DataFrame
-  ) -> np.ndarray:
-    ...
-
-  def predict(
-    self,
-    data: pd.DataFrame | Mapping[config.dataset_t, pd.DataFrame],
-  ) -> np.ndarray:
+  def predict(self, data: pd.DataFrame | config.datadict_t) -> np.ndarray:
     
     util.echo(self.verbose, f'+ computing predictions')
 
@@ -164,21 +150,11 @@ class model(abc.ABC):
 
     y = self._predict(x)
     y = pd.Series(y, index = x.index)
+
     return y
 
   # save model
-
-  @abc.abstractmethod
-  def _save(
-    self,
-    path: pathlib.Path,
-  ) -> pathlib.Path:
-    ...
-
-  def save(
-    self,
-    path: str | os.PathLike,
-  ) -> pathlib.Path:
+  def save(self, path: config.path_t) -> pathlib.Path:
     
     outdir = pathlib.Path(path).resolve()
     os.makedirs(outdir, exist_ok = True)
@@ -194,6 +170,9 @@ class model(abc.ABC):
     util.json_save(self.cfg, outdir/'config')
     util.echo(self.verbose, f'+ model configuration saved to {outdir}/config.json')
 
+    util.json_save(self.history, path/'history')
+    util.echo(self.verbose, f'+ training history saved to {path}/history.json')
+
     return outdir
 
 # *
@@ -201,11 +180,7 @@ class model(abc.ABC):
 # *
 
 class gradient_boosting_regressor(model):
-  def __init__(
-    self,
-    verbose: bool = True,
-    **kwargs
-  ) -> None:
+  def __init__(self, verbose: bool = True, **kwargs) -> None:
     
     super().__init__(verbose = verbose)
     
@@ -215,41 +190,21 @@ class gradient_boosting_regressor(model):
 
     self._xgb = xgboost.XGBRegressor(**kwargs)
 
-  def _draw(
-    self,
-    ax: matplotlib.axes.Axes,
-  ) -> None:
-
-    yt = self.xgb.evals_result()['validation_0']['rmse']
-    yv = self.xgb.evals_result()['validation_1']['rmse']
-    x = np.arange(len(yt)) + 1
-
-    ax.plot(x, yv, '-', label = 'Validation', color = 'navy', alpha = 0.7)
-    ax.plot(x, yt, '--', label = 'Train', color = 'orange')
-    ax.set_ylabel('Root mean squared error')
-    ax.set_xlabel('$n_\mathrm{trees}$')
-    ax.legend()
-  
-  def _fit(
-    self,
-    train: tuple[pd.DataFrame, pd.Series],
-    validation: tuple[pd.DataFrame, pd.Series],
-  ) -> None:
+  def _fit(self, train, validation) -> dict:
     
-    self.xgb.fit(*train, eval_set = [train, validation], verbose = self.verbose)
-  
-  def _predict(
-    self,
-    x: pd.DataFrame,
-  ) -> np.ndarray:
-    
+    m = self.xgb.fit(*train, eval_set = [train, validation], verbose = self.verbose)
+
+    return {
+      'loss': m.evals_result()['validation_0']['rmse'],
+      'val_loss': m.evals_result()['validation_1']['rmse'],
+      'xlabel': '$n_\mathrm{trees}$',
+      'x': np.arange(m.get_booster().num_boosted_rounds()) + 1
+    }
+
+  def _predict(self, x) -> np.ndarray:
     return self.xgb.predict(x)
   
-  def _save(
-    self,
-    path: pathlib.Path,
-  ) -> None:
-    
+  def _save(self, path) -> None:
     self.xgb.save_model(path/'model.ubj')
 
   @property
@@ -318,26 +273,7 @@ class multilayer_perceptron_regressor(model):
     self._mlp = mlp
     self._verbosity_level = int(self.verbose) * (2 - int(util.interactive()))
 
-  def _draw(
-    self,
-    ax: matplotlib.axes.Axes,
-  ) -> None:
-    
-    trn_loss = self.history['loss']
-    val_loss = self.history['val_loss']
-    epochs = self.history['epochs']
-
-    ax.plot(epochs, np.sqrt(val_loss), '-', label = 'Validation', c = 'navy', alpha = 0.7)
-    ax.plot(epochs, np.sqrt(trn_loss), '--', label = 'Train', c = 'orange')
-    ax.legend()
-    ax.set_ylabel('RMS error')
-    ax.set_xlabel('Learning epoch')
-  
-  def _fit(
-    self,
-    train: tuple[pd.DataFrame, pd.Series],
-    validation: tuple[pd.DataFrame, pd.Series],
-  ) -> None:
+  def _fit(self, train, validation) -> None:
     
     history = self.mlp.fit(
       x = train[0],
@@ -349,29 +285,20 @@ class multilayer_perceptron_regressor(model):
       validation_data = validation,
     )
 
-    self._history = {k: [float(i) for i in v] for k, v in history.history.items()}
-    self._history['epochs'] = history.epoch
+    return {
+      'loss': [float(i) for i in np.sqrt(history.history['loss'])],
+      'val_loss': [float(i) for i in np.sqrt(history.history['val_loss'])],
+      **{k: [float(i) for i in v] for k, v in history.history.items() if k not in ['loss', 'val_loss']},
+      'xlabel': 'Epoch',
+      'x': history.epoch,
+    }
   
-  def _predict(
-    self,
-    x: pd.DataFrame,
-  ) -> np.ndarray:
-    
+  def _predict(self, x) -> np.ndarray:
     return self.mlp.predict(x, verbose = self._verbosity_level).flatten()
   
-  def _save(
-    self,
-    path: pathlib.Path,
-  ) -> None:
-    
+  def _save(self, path) -> None:
     self.mlp.save(path/'model')
-    util.json_save(self.history, path/'history')
-    util.echo(self.verbose, f'+ training history saved to {path}/history.json')
 
   @property
   def mlp(self):
     return self._mlp
-  
-  @property
-  def history(self):
-    return self._history
