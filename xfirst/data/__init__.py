@@ -77,9 +77,11 @@ def load_profiles(
     depths = depths[xslice]
 
   # load data
-  ret = {d: util.hdf_load(path = profdir/d, key = particles, columns = columns) for d in util.strlist(datasets)}
+  profiles = {}
+  for d in util.strlist(datasets):
+    profiles[d] = util.hdf_load(path = profdir/d, key = particles, columns = columns)
     
-  return {**ret, 'depths': depths}
+  return {**profiles, 'depths': depths}
 
 def load_fits(
   datadir: str | os.PathLike,
@@ -89,24 +91,46 @@ def load_fits(
   columns: str | Sequence[str] | None = None,
   xfirst: bool = False,
   norm: str | Sequence[str] | None = None,
-  drop_bad: bool = False,
-) -> pd.DataFrame | dict[pd.DataFrame]:
+  drop_bad: bool | Mapping[config.dataset_t, bool] = False,
+  nshowers: int | Mapping[config.dataset_t, int] | None = None, 
+) -> pd.DataFrame | dict[config.dataset_t, pd.DataFrame]:
   
-  cutrange = config.get_cut(cut)
-  path = f'{datadir}/fits/range-{cutrange.min_depth}-{cutrange.max_depth}'
+  cut = config.get_cut(cut)
+  datasets = util.strlist(datasets)
+  particles = util.strlist(particles)
+  columns = util.strlist(columns)
+  drop_bad = dict.fromkeys(datasets, drop_bad) if isinstance(drop_bad, bool) else {d: drop_bad[d] for d in datasets}
+  nshowers = dict.fromkeys(datasets, nshowers) if isinstance(nshowers, int | None) else {d: nshowers[d] for d in datasets}
+  path = f'{datadir}/fits/range-{cut.min_depth}-{cut.max_depth}'
 
-  fits = {d: util.hdf_load(f'{path}/{d}', key = util.strlist(particles), columns = columns) for d in util.strlist(datasets)}
+  fits = {}
 
-  if xfirst is True:
-    xfdata = {d: util.hdf_load(f'{datadir}/xfirst/{d}', key = particles) for d in util.strlist(datasets)}
-    fits = {d: fits[d].join(xfdata[d]) for d in util.strlist(datasets)}
+  for d in datasets:
 
-  if drop_bad is True:
-    for d in util.strlist(datasets):
-      bad = util.hdf_load(f'{path}/{d}', key = util.strlist(particles), columns = 'status')
-      bad = bad.status < 0.99
-      bad = bad.index[bad]
-      fits[d].drop(bad, inplace = True)
+    if drop_bad[d] is True and nshowers[d] is not None:
+      fitsdata = []
+
+      for p in particles:
+        status = util.hdf_load(f'{path}/{d}', key = p, columns = 'status').status
+        nrows = status[status > 0.99].index[nshowers[d]]
+        data = util.hdf_load(f'{path}/{d}', key = p, columns = columns, nrows = nrows)
+        badindices = data.index[status[:nrows] < 0.99]
+        data.drop(badindices, inplace = True)
+        fitsdata.append(data)
+
+      fits[d] = pd.concat(fitsdata, keys = particles, copy = False)
+    else:
+      fits[d] = util.hdf_load(f'{path}/{d}', key = particles, columns = columns, nrows = nshowers[d])
+      if xfirst is True:
+        xfdata = util.hdf_load(f'{datadir}/xfirst/{d}', key = particles, nrows = nshowers[d])
+        fits[d] = fits[d].join(xfdata)
+
+      if drop_bad[d] is True:
+        status = util.hdf_load(f'{path}/{d}', key = particles, columns = 'status').status
+        fits[d].drop(fits.index[status < 0.99], inplace = True)
+      elif any(drop_bad.values()) and columns is not None and not 'status' in columns:
+        status = util.hdf_load(f'{path}/{d}', key = particles, columns = 'status')
+        fits[d] = fits[d].join(status)
 
   if norm is not None:
     fits = normalize(fits, norm)
@@ -120,5 +144,8 @@ def load_xfirst(
   columns: str | Sequence[str] | None = None,
 ) -> pd.DataFrame | dict[pd.DataFrame]:
 
-  xfdata = {d: util.hdf_load(f'{datadir}/xfirst/{d}', key = particles, columns = columns) for d in util.strlist(datasets)}
+  xfdata = {}
+  for d in util.strlist(datasets):
+    xfdata[d] = util.hdf_load(f'{datadir}/xfirst/{d}', key = particles, columns = columns)
+
   return util.collapse(xfdata)
