@@ -50,7 +50,6 @@ def main(
       input = len(x),
       layers = layers,
       verbose = verbose,
-      epochs = 10,
     ).fit(data, x, y)
 
     # save model
