@@ -42,7 +42,9 @@ def main(
     )
 
     # fit the gradient boosting regressor and add to return dict
-    model = xfirst.models.gradient_boosting_regressor().fit(data, x, y)
+    model = xfirst.models.gradient_boosting_regressor(
+      verbose = verbose
+    ).fit(data, x, y)
 
     # save model
     if save is not None:
