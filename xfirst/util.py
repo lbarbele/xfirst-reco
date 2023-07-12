@@ -20,27 +20,6 @@ def echo(verbose: bool, msg) -> None:
 
   if verbose: print(msg)
   
-def get_range(values: np.ndarray, min_value: float | None = None, max_value: float | None = None) -> tuple[int | None, int | None]:
-
-  if min_value is not None and max_value is not None and min_value >= max_value:
-    raise RuntimeError('get_range: min must be smaller than max')
-
-  ileft, iright = None, None
-
-  if min_value is not None and min_value > values[0]:
-    if min_value > values[-1]:
-      raise RuntimeError('get_range: min is out of range') 
-    
-    ileft = (values > min_value).argmax()
-
-  if max_value is not None and max_value < values[-1]:
-    if max_value < values[0]:
-      raise RuntimeError('get_range: max is out of range')
-    
-    iright = (values < max_value).argmin()
-  
-  return slice(ileft, iright)
-
 def interactive():
   return hasattr(sys, 'ps1') or hasattr(sys, 'ps2')
 

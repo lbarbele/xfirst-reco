@@ -57,29 +57,43 @@ def normalize(
 # * dataset loaders
 # *
 
+def load_depths(
+  datadir: str | os.PathLike,
+  cut: config.cut | str | None = None,
+):
+  
+  path = pathlib.Path(f'{datadir}/profiles/depths.npy').resolve(strict = True)
+  x = np.load(path)
+  x = pd.Series(x, index = [f'Edep_{i}' for i in range(x.shape[0])])
+
+  if cut is not None:
+    cut = config.cut.get(cut)
+    out = x[(x < cut.min_depth) | (x > cut.max_depth)].index
+    x.drop(out, inplace = True)
+
+  return x
+
 def load_profiles(
   datadir: str | os.PathLike,
   cut: config.cut | str | None = None,
   datasets: Sequence[config.dataset_t] = config.datasets,
   particles: config.particle_t | Sequence[config.particle_t] = config.particles,
+  norm: bool = False,
+  nshowers: int | Mapping[config.dataset_t, int] | None = None,
 ) -> dict[config.dataset_t, np.ndarray] | pd.DataFrame:
   
+  # helper function to retrieve depths
+  
   profdir = pathlib.Path(datadir).resolve()/'profiles'
+  datasets = util.strlist(datasets)
+  particles = util.strlist(particles)
+  nshowers = dict.fromkeys(datasets, nshowers) if isinstance(nshowers, int | None) else dict(nshowers)
 
-  # read depths and determine depth cuts
-  depths = np.load(profdir/'depths.npy')
-  columns = [f'Edep_{i}' for i in range(len(depths))]
+  depths = load_depths(datadir, cut)
+  profiles = {d: util.hdf_load(profdir/d, particles, nshowers[d], depths.index) for d in datasets}
 
-  if cut is not None:
-    cut = config.cut.get(cut)
-    xslice = util.get_range(depths, cut.min_depth, cut.max_depth)
-    columns = columns[xslice]
-    depths = depths[xslice]
-
-  # load data
-  profiles = {}
-  for d in util.strlist(datasets):
-    profiles[d] = util.hdf_load(path = profdir/d, key = particles, columns = columns)
+  if norm is True:
+    profiles = normalize(profiles, depths.index)
     
   return {**profiles, 'depths': depths}
 
