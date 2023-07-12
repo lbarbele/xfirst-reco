@@ -89,22 +89,29 @@ class model(abc.ABC):
     return fig
   
   # evaluate model, optionally plot, optionally save
-  def eval( self, data: config.datadict_t, save: config.path_t | None = None, plot: bool = False) -> pd.DataFrame:
+  def eval(self, data: config.datadict_t, save: config.path_t | None = None, plot: bool = False) -> pd.DataFrame:
+
+    test = data['test']
 
     # compute predictions
     results = {}
-    results['predictions'] = self.predict(data['test'][self.features])
-    results['target'] = data['test'][self.target]
+    results['predictions'] = self.predict(test[self.features])
+    results['target'] = test[self.target]
     results['residuals'] = results['predictions'] - results['target']
-    results['lgE'] = data['test']['lgE']
-    results['good'] = data['test']['status'] > 0.99
+    results['lgE'] = test['lgE']
+
+    if 'status' in test.columns: # for fit data
+      results['good'] = test['status'] > 0.99
+
     results = pd.DataFrame(results)
 
     # draw predictions
     if plot is True:
       util.echo(self.verbose, '+ drawing predictions')
-      goodresults = results.loc[results['good']]
-      fig = viz.draw_predictions(goodresults)
+      if 'good' in results.columns:
+        fig = viz.draw_predictions(results.loc[results['good']])
+      else:
+        fig = viz.draw_predictions(results)
     
     if save is not None:
       # save model
