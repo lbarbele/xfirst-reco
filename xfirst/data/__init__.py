@@ -76,8 +76,9 @@ def load_depths(
 def load_profiles(
   datadir: str | os.PathLike,
   cut: config.cut | str | None = None,
-  datasets: Sequence[config.dataset_t] = config.datasets,
+  datasets: str | Sequence[config.dataset_t] = config.datasets,
   particles: config.particle_t | Sequence[config.particle_t] = config.particles,
+  xfirst: bool = False,
   norm: bool = False,
   nshowers: int | Mapping[config.dataset_t, int] | None = None,
 ) -> dict[config.dataset_t, np.ndarray] | pd.DataFrame:
@@ -90,7 +91,14 @@ def load_profiles(
   nshowers = dict.fromkeys(datasets, nshowers) if isinstance(nshowers, int | None) else dict(nshowers)
 
   depths = load_depths(datadir, cut)
-  profiles = {d: util.hdf_load(profdir/d, particles, nshowers[d], depths.index) for d in datasets}
+
+  profiles = {}
+  for d in datasets:
+    profiles[d] = util.hdf_load(profdir/d, particles, nshowers[d], depths.index)
+
+    if xfirst is True:
+      xfdata = util.hdf_load(f'{datadir}/xfirst/{d}', particles, nshowers[d])
+      profiles[d] = profiles[d].join(xfdata)
 
   if norm is True:
     profiles = normalize(profiles, depths.index)
