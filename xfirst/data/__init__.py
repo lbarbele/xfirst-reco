@@ -113,7 +113,12 @@ def load_fits(
       for p in particles:
         status = util.hdf_load(f'{path}/{d}', key = p, columns = 'status').status
         nrows = status[status > 0.99].index[nshowers[d]]
+
         data = util.hdf_load(f'{path}/{d}', key = p, columns = columns, nrows = nrows)
+        if xfirst is True:
+          xfdata = util.hdf_load(f'{datadir}/xfirst/{d}', key = p, nrows = nrows)
+          data = data.join(xfdata)
+
         badindices = data.index[status[:nrows] < 0.99]
         data.drop(badindices, inplace = True)
         fitsdata.append(data)
