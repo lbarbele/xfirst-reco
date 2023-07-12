@@ -1,0 +1,28 @@
+#!/bin/bash
+#SBATCH      --job-name trainmlp
+#SBATCH         --nodes 1
+#SBATCH --cpus-per-task 48
+#SBATCH     --partition sequana_cpu,sequana_cpu_shared,sequana_cpu_long,sequana_gpu,sequana_gpu_shared,sequana_gpu_long
+#SBATCH          --time 03:00:00
+#SBATCH     --mail-type ALL
+#SBATCH     --mail-user luan.arbeletche@gmail.com
+#SBATCH        --output /dev/null #? do not change
+#SBATCH         --error /dev/null #? do not change
+#SBATCH     --exclusive           #? do not change
+
+# parse specification of hidden layers from input                                                                                                                                                               
+layers=${1?'missing specification of the hidden layers'}
+layers=$(echo ${layers} | sed 's/[,.\/:]/-/g')
+
+# set job name
+export RENAME_JOB="mlp-fit-${layers}"
+
+source /scratch/astroparti/luan.arbeletche/ml-conex-xfirst/sd-scripts/prepare_env.sh
+
+python "${SCRIPTS_DIR}/train_xgb_fit.py" \
+  --datadir "${DATA_DIR}" \
+  --layers "${layers}" \
+  --save "${MODELS_DIR}" \
+  --nshowers train "${NTRAIN}" \
+  --nshowers validation "${NVAL}" \
+  --nshowers test "${NTEST}"
