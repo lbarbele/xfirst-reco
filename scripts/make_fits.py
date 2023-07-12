@@ -42,18 +42,19 @@ def make_fits(
   verbose : bool, default True
     if true, information will be printed as data is processed.
   """
-  basedir = pathlib.Path(datadir).resolve()
+  datadir = pathlib.Path(datadir).resolve()
+  fitsdir = datadir/'fits'
   batches = workers or os.cpu_count() or 1
   function = profile_functions.usp
 
-  util.echo(verbose, f'generating fits for cut configurations {[c.name for c in config.cuts]}')
+  util.echo(verbose, f'generating fits for cut configurations {config.cut.names()}')
 
-  for c in config.cuts:
+  for c in config.cut.get():
     util.echo(verbose, f'\nprocessing cut configuration {c.name}')
 
     for d, p in itertools.product(config.datasets, config.particles):
-      
-      profiles, depths = data.load_profiles(datadir = basedir, cut = c, datasets = d, particles = p).values()
+
+      profiles, depths = data.load_profiles(datadir = datadir, cut = c, datasets = d, particles = p).values()
 
       ys = [y.to_numpy() for y in util.split(profiles, batches = batches)]
       xs = [itertools.repeat(np.copy(depths), len(y)) for y in ys]
@@ -66,7 +67,7 @@ def make_fits(
         # update status by applying cuts
         fits.status = data.get_good_fits(fits, c).astype(fits.status.dtype)
         # save
-        util.hdf_save(basedir/f'fits/range-{c.min_depth}-{c.max_depth}/{d}', fits, p, verbose)
+        util.hdf_save(c.path(fitsdir)/d, fits, p, verbose)
 
 @click.command()
 @click.option('--datadir', type = click.Path(exists = True), required = True)

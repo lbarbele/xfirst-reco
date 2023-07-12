@@ -16,10 +16,10 @@ from . import conex
 
 def get_good_fits(
   fits: pd.DataFrame,
-  cut: config.cut_t,
+  cut: config.cut | str,
 ) -> pd.Series:
 
-  c = config.get_cut(cut)
+  cut = config.cut.get(cut)
 
   mask = True
 
@@ -28,7 +28,7 @@ def get_good_fits(
   # no nans or inf
   mask &= np.isfinite(fits).all(axis = 1)
   # xmax is within cut range
-  mask &= (c.min_depth + 10 < fits.Xmax) & (fits.Xmax < c.max_depth - 10)
+  mask &= (cut.min_depth + 10 < fits.Xmax) & (fits.Xmax < cut.max_depth - 10)
   # params, errors, status, chi2, and ndf are all positive
   mask &= (fits > 0).all(axis = 1)
 
@@ -59,7 +59,7 @@ def normalize(
 
 def load_profiles(
   datadir: str | os.PathLike,
-  cut: config.cut_t | str | None = None,
+  cut: config.cut | str | None = None,
   datasets: Sequence[config.dataset_t] = config.datasets,
   particles: config.particle_t | Sequence[config.particle_t] = config.particles,
 ) -> dict[config.dataset_t, np.ndarray] | pd.DataFrame:
@@ -71,8 +71,8 @@ def load_profiles(
   columns = [f'Edep_{i}' for i in range(len(depths))]
 
   if cut is not None:
-    xrange = config.get_cut(cut)
-    xslice = util.get_range(depths, xrange.min_depth, xrange.max_depth)
+    cut = config.cut.get(cut)
+    xslice = util.get_range(depths, cut.min_depth, cut.max_depth)
     columns = columns[xslice]
     depths = depths[xslice]
 
@@ -85,7 +85,7 @@ def load_profiles(
 
 def load_fits(
   datadir: str | os.PathLike,
-  cut: config.cut_t | str,
+  cut: config.cut | str,
   datasets: config.dataset_t | Sequence[config.dataset_t] = config.datasets,
   particles: config.particle_t | Sequence[config.dataset_t] = config.particles,
   columns: str | Sequence[str] | None = None,
@@ -96,18 +96,18 @@ def load_fits(
   verbose: bool = False,
 ) -> pd.DataFrame | dict[config.dataset_t, pd.DataFrame]:
   
-  cut = config.get_cut(cut)
+  cut = config.cut.get(cut)
   datasets = util.strlist(datasets)
   particles = util.strlist(particles)
   columns = util.strlist(columns)
   drop_bad = dict.fromkeys(datasets, drop_bad) if isinstance(drop_bad, bool) else dict(drop_bad)
   nshowers = dict.fromkeys(datasets, nshowers) if isinstance(nshowers, int | None) else dict(nshowers)
-  path = f'{datadir}/fits/range-{cut.min_depth}-{cut.max_depth}'
+  path = cut.path(f'{datadir}/fits')
 
   fits = {}
 
-  util.echo(verbose, f'+ loading fits from {path}')
-  util.echo(verbose and xfirst, f'+ loading xfirst data from {pathlib.Path({datadir}/xfirst).resolve()}')
+  util.echo(verbose, f'+ loading fits of {datasets} datasets from {path}')
+  util.echo(verbose and xfirst, f'+ loading xfirst data from {datadir}/xfirst')
 
   for d in datasets:
 

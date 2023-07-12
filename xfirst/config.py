@@ -1,4 +1,5 @@
-from collections import namedtuple
+import os
+import pathlib
 import typing
 
 dataset_t = typing.Literal['train', 'validation', 'test']
@@ -7,77 +8,55 @@ datasets = typing.get_args(dataset_t)
 particle_t = typing.Literal['p', 'He', 'C', 'Si', 'Fe']
 particles = typing.get_args(particle_t)
 
-cut_t = namedtuple('cut_config', ('name', 'min_depth', 'max_depth'))
+class cut():
+  _cuts = {
+    'A1': dict(min_depth = 600, max_depth = 1000),
+    'A2': dict(min_depth = 350, max_depth = 1000),
+    'A3': dict(min_depth = 100, max_depth = 1000),
+    'B1': dict(min_depth = 650, max_depth = 1250),
+    'B2': dict(min_depth = 300, max_depth = 1250),
+    'B3': dict(min_depth =  50, max_depth = 1250),
+    'C1': dict(min_depth = 450, max_depth = 1750),
+    'C2': dict(min_depth = 100, max_depth = 1750),
+    'C3': dict(min_depth =   0, max_depth = 1750),
+  }
 
-_cuts = (
-  cut_t(
-    name = 'A1',
-    min_depth = 600,
-    max_depth = 1000,
-  ),
-  cut_t(
-    name = 'A2',
-    min_depth = 350,
-    max_depth = 1000,
-  ),
-  cut_t(
-    name = 'A3',
-    min_depth = 100,
-    max_depth = 1000,
-  ),
-  cut_t(
-    name = 'B1',
-    min_depth = 650,
-    max_depth = 1250,
-  ),
-  cut_t(
-    name = 'B2',
-    min_depth = 300,
-    max_depth = 1250,
-  ),
-  cut_t(
-    name = 'B3',
-    min_depth = 50,
-    max_depth = 1250,
-  ),
-  cut_t(
-    name = 'C1',
-    min_depth = 450,
-    max_depth = 1750,
-  ),
-  cut_t(
-    name = 'C2',
-    min_depth = 100,
-    max_depth = 1750,
-  ),
-  cut_t(
-    name = 'C3',
-    min_depth = 0,
-    max_depth = 1750,
-  ),
-)
+  def __init__(self, name: str, min_depth: int, max_depth: int):
+    self._name = name
+    self._min_depth = min_depth
+    self._max_depth = max_depth
 
-def get_cut(i):
-  if i is None:
-    return cut_t('none', None, None)
-  elif isinstance(i, cut_t):
-    return i
-  elif isinstance(i, int):
-    return _cuts(i)
-  elif isinstance(i, str):
-    for c in _cuts:
-      if c.name == i:
-        return c
-  elif isinstance(i, dict):
-    if 'min_depth' in i and 'max_depth' in i:
-      return cut_t(i.get('name', 'unnamed'), i['min_depth'], i['max_depth'])
-  elif hasattr(i, 'min_depth') and hasattr(i, 'max_depth'):
-    return cut_t(getattr(i, 'name', 'unnamed'), i.min_depth, i.max_depth)
-  elif isinstance(i, list | tuple) and len(i) == 2:
-    if isinstance(i[0], float | int) and isinstance(i[1], float | int):
-      return cut_t('unnamed', int(i[0]), int(i[1]))
+  @staticmethod
+  def count():
+    return len(cut._cuts)
 
-  raise ValueError(f'get_cuts: non existent cut {i}')
+  @staticmethod
+  def get(input = None):
+    if isinstance(input, cut):
+      return input
+    elif input is None:
+      return tuple(cut(k, **v) for k, v in cut._cuts.items())
+    else:
+      return cut(input, **cut._cuts[input])
+  
+  @staticmethod
+  def names():
+    return tuple(c.name for c in cut.get())
+  
+  def path(self, base: str | os.PathLike):
+    return pathlib.Path(base).resolve()/f'range-{self.min_depth}-{self.max_depth}'
 
-cuts = namedtuple('cuts_tuple', [c.name for c in _cuts])(*_cuts)
-cut_names = tuple(c.name for c in cuts)
+  @property
+  def max_depth(self):
+    return self._max_depth
+
+  @property
+  def min_depth(self):
+    return self._min_depth
+  
+  @property
+  def name(self):
+    return self._name
+  
+for c in cut.get():
+  setattr(cut, c.name, c)
