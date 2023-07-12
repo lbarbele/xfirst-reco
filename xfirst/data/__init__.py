@@ -92,18 +92,22 @@ def load_fits(
   xfirst: bool = False,
   norm: str | Sequence[str] | None = None,
   drop_bad: bool | Mapping[config.dataset_t, bool] = False,
-  nshowers: int | Mapping[config.dataset_t, int] | None = None, 
+  nshowers: int | Mapping[config.dataset_t, int] | None = None,
+  verbose: bool = False,
 ) -> pd.DataFrame | dict[config.dataset_t, pd.DataFrame]:
   
   cut = config.get_cut(cut)
   datasets = util.strlist(datasets)
   particles = util.strlist(particles)
   columns = util.strlist(columns)
-  drop_bad = dict.fromkeys(datasets, drop_bad) if isinstance(drop_bad, bool) else {d: drop_bad[d] for d in datasets}
-  nshowers = dict.fromkeys(datasets, nshowers) if isinstance(nshowers, int | None) else {d: nshowers[d] for d in datasets}
+  drop_bad = dict.fromkeys(datasets, drop_bad) if isinstance(drop_bad, bool) else dict(drop_bad)
+  nshowers = dict.fromkeys(datasets, nshowers) if isinstance(nshowers, int | None) else dict(nshowers)
   path = f'{datadir}/fits/range-{cut.min_depth}-{cut.max_depth}'
 
   fits = {}
+
+  util.echo(verbose, f'+ loading fits from {path}')
+  util.echo(verbose and xfirst, f'+ loading xfirst data from {pathlib.Path({datadir}/xfirst).resolve()}')
 
   for d in datasets:
 
