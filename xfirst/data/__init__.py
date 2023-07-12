@@ -107,7 +107,7 @@ def load_fits(
   fits = {}
 
   util.echo(verbose, f'+ loading fits of {datasets} datasets from {path}')
-  util.echo(verbose and xfirst, f'+ loading xfirst data from {datadir}/xfirst')
+  util.echo(verbose and xfirst, f'+ loading xfirst data from {pathlib.Path(f"{datadir}/xfirst").resolve()}')
 
   for d in datasets:
 
