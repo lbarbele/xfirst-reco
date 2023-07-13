@@ -248,15 +248,15 @@ def draw_predictions(
   pallete: str = 'viridis',
   style: str = 'dark',
 ):
+  
   particles = [p for p in config.particles if p in data.index.levels[0]]
   npart = len(particles)
   nrows = 5
-
-  fig, axes = matplotlib.pyplot.subplots(nrows, npart, figsize = (4*npart, 4*nrows), sharey = 'row')
-
   colors = sns.color_palette(pallete, n_colors = 2 + npart)[1:-1]
 
   with sns.axes_style(style):
+    fig, axes = matplotlib.pyplot.subplots(nrows, npart, figsize = (4*npart, 4*nrows), sharey = 'row')
+    
     for icol, p in enumerate(particles):
       rowdata = data.loc[p]
 
