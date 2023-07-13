@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH      --job-name trainmlp
+#SBATCH      --job-name mlpfit
 #SBATCH         --nodes 1
 #SBATCH --cpus-per-task 48
 #SBATCH     --partition sequana_cpu,sequana_cpu_shared,sequana_cpu_long,sequana_gpu,sequana_gpu_shared,sequana_gpu_long
@@ -19,7 +19,7 @@ export RENAME_JOB="mlp-fit-${layers}"
 
 source /scratch/astroparti/luan.arbeletche/ml-conex-xfirst/sd-scripts/prepare_env.sh
 
-python "${SCRIPTS_DIR}/train_xgb_fit.py" \
+python "${SCRIPTS_DIR}/train_mlp_fit.py" \
   --datadir "${DATA_DIR}" \
   --layers "${layers}" \
   --save "${MODELS_DIR}" \
