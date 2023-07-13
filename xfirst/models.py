@@ -223,8 +223,6 @@ class gradient_boosting_regressor(model):
 # *
 
 class multilayer_perceptron_regressor(model):
-  pass
-  
   def __init__(
     self,
     input: int,
