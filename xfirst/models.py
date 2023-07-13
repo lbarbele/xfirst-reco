@@ -215,7 +215,7 @@ class model(abc.ABC):
     util.echo(self.verbose, f'+ model configuration saved to {outdir}/config.json')
 
     util.json_save(self.history, path/'history')
-    util.echo(self.verbose, f'+ training history saved to {path}/history.json')
+    util.echo(self.verbose, f'+ training history saved to {outdir}/history.json')
 
     return outdir
   
