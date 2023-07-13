@@ -231,8 +231,8 @@ class multilayer_perceptron_regressor(model):
     optimizer: str = 'adam',
     batch_size: int = 32,
     epochs: int = 1000,
-    early_stopping: int | None = 11,
-    reduce_lr: int | None = 5,
+    early_stopping: int | None = 35,
+    reduce_lr: int | None = 10,
   ) -> None:
     
     super().__init__(verbose = verbose)
