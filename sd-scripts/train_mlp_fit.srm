@@ -3,7 +3,7 @@
 #SBATCH         --nodes 1
 #SBATCH --cpus-per-task 48
 #SBATCH     --partition sequana_cpu,sequana_cpu_shared,sequana_cpu_long,sequana_gpu,sequana_gpu_shared,sequana_gpu_long
-#SBATCH          --time 12:00:00
+#SBATCH          --time 24:00:00
 #SBATCH     --mail-type ALL
 #SBATCH     --mail-user luan.arbeletche@gmail.com
 #SBATCH        --output /dev/null #? do not change

@@ -10,7 +10,7 @@ import xfirst
 @click.option('--datadir', type = click.Path(exists = True, dir_okay = True), required = True)
 @click.option('--layers', type = str, required = True)
 @click.option('--save', type = click.Path(), required = False, default = None)
-@click.option('--cuts', type = str, required = False, multiple = False, default = xfirst.config.cut.names())
+@click.option('--cuts', type = str, required = False, default = ','.join(xfirst.config.cut.names()))
 @click.option('--nshowers', type = (str, click.IntRange(1, None)), required = True, multiple = True)
 @click.option('--verbose/--no-verbose', default = True)
 def main(
@@ -22,9 +22,9 @@ def main(
   verbose: bool = True,
 ):
   
-  layers = re.sub(',|-|\.|\/', ':', layers).split(':')
+  layers = [int(i) for i in re.sub(',|-|\.|\/', ':', layers).split(':')]
   cuts = [xfirst.config.cut.get(c) for c in xfirst.util.strlist(cuts)]
-  
+
   x = xfirst.profile_functions.usp().parameter_names
   y = 'Xfirst'
   

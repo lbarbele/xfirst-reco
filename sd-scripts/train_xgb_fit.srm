@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH      --job-name trainxgb
+#SBATCH      --job-name xgbfit
 #SBATCH         --nodes 1
 #SBATCH --cpus-per-task 48
 #SBATCH     --partition sequana_cpu,sequana_cpu_shared,sequana_cpu_long,sequana_gpu,sequana_gpu_shared,sequana_gpu_long

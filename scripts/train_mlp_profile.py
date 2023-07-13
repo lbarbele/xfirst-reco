@@ -22,13 +22,13 @@ def main(
   verbose: bool = True,
 ):
   
-  layers = re.sub(',|-|\.|\/', ':', layers).split(':')
+  layers = [int(i) for i in re.sub(',|-|\.|\/', ':', layers).split(':')]
   cut = xfirst.config.cut.get(cut)
 
   x = xfirst.data.load_depths('data', cut).index.to_list()
   y = 'Xfirst'
 
-  xfirst.util.echo(f'processing profiles from cut {cut.name}')
+  xfirst.util.echo(verbose, f'processing profiles from cut {cut.name}')
 
   data = xfirst.data.load_profiles(
     datadir  = datadir,
@@ -48,7 +48,7 @@ def main(
   if save is not None:
     model.eval(
       data = data,
-      save = cut.path(f'{save}/mlp-fit-' + '-'.join(map(str, layers))),
+      save = cut.path(f'{save}/mlp-profile-' + '-'.join(map(str, layers))),
       plot = True
     )
 
