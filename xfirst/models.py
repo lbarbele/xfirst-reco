@@ -55,7 +55,7 @@ def get_keras_callbacks(
   return callbacks
 
 # *
-# * model interface
+# * model interfaces
 # *
 
 class model(abc.ABC):
@@ -218,6 +218,60 @@ class model(abc.ABC):
     util.echo(self.verbose, f'+ training history saved to {path}/history.json')
 
     return outdir
+  
+class neural_network(model):
+  def __init__(
+    self,
+    batch_size: int = 32,
+    epochs: int = 1000,
+    verbose: bool = True,
+  ) -> None:
+    
+    super().__init__(verbose = verbose)
+
+    self.cfg['batch_size'] = batch_size
+
+    self._batch_size = batch_size
+    self._callbacks = get_keras_callbacks(verbose = verbose)
+    self._epochs = epochs
+    self._verbosity_level = int(self.verbose) * (2 - int(util.interactive()))
+    self._model = None
+
+  def _fit(self, train, validation) -> None:
+
+    history = self.nn.fit(
+      x = train[0],
+      y = train[1],
+      batch_size = self._batch_size,
+      epochs = self._epochs,
+      verbose = self._verbosity_level,
+      callbacks = self._callbacks,
+      validation_data = validation,
+    )
+
+    history = {
+      'loss': [float(i) for i in np.sqrt(history.history['loss'])],
+      'val_loss': [float(i) for i in np.sqrt(history.history['val_loss'])],
+      'xlabel': 'Epoch',
+      'x': history.epoch,
+      **{k: [float(i) for i in v] for k, v in history.history.items() if k not in ['loss', 'val_loss']},
+    }
+
+    return history
+  
+  def _predict(self, x) -> np.ndarray:
+    return self.nn.predict(x, verbose = self._verbosity_level).flatten()
+  
+  def _save(self, path) -> None:
+    self.nn.save(path/'model')
+
+  @property
+  def nn(self):
+    return self._model
+  
+  @nn.setter
+  def nn(self, value: keras.Model):
+    self._model = value
 
 # *
 # * XGboost wrapper
@@ -259,60 +313,48 @@ class gradient_boosting_regressor(model):
 # * mlp wrapper
 # *
 
-class multilayer_perceptron_regressor(model):
+class multilayer_perceptron_regressor(neural_network):
   def __init__(
     self,
     input: int,
     layers: Iterable[int],
-    verbose: bool = True,
     optimizer: str = 'adam',
     batch_size: int = 32,
     epochs: int = 1000,
+    verbose: bool = True,
   ) -> None:
     
-    super().__init__(verbose = verbose)
-
-    self.cfg['batch_size'] = batch_size
+    super().__init__(batch_size, epochs, verbose)
 
     layers = [keras.layers.Dense(u, 'relu') for u in layers]
     layers.insert(0, keras.Input(shape = input))
     layers.append(keras.layers.Dense(1))
 
-    mlp = keras.Sequential(layers)
-    mlp.compile(optimizer = optimizer, loss = 'mse')
+    self.nn = keras.Sequential(layers)
+    self.nn.compile(optimizer = optimizer, loss = 'mse')
 
-    self._batch_size = batch_size
-    self._epochs = epochs
-    self._callbacks = get_keras_callbacks(verbose = verbose)
-    self._mlp = mlp
-    self._verbosity_level = int(self.verbose) * (2 - int(util.interactive()))
-
-  def _fit(self, train, validation) -> None:
+class recurrent_network(neural_network):
+  def __init__(
+    self,
+    input: tuple[int, int],
+    recurrent_layers: Sequence[int],
+    dense_layers: Sequence[int],
+    bidirectional: bool = False,
+    optimizer: str = 'adam',
+    batch_size: int = 32,
+    epochs: int = 1000,
+    verbose: bool = True,
+  ):
     
-    history = self.mlp.fit(
-      x = train[0],
-      y = train[1],
-      batch_size = self._batch_size,
-      epochs = self._epochs,
-      verbose = self._verbosity_level,
-      callbacks = self._callbacks,
-      validation_data = validation,
-    )
+    super().__init__(batch_size, epochs, verbose)
 
-    return {
-      'loss': [float(i) for i in np.sqrt(history.history['loss'])],
-      'val_loss': [float(i) for i in np.sqrt(history.history['val_loss'])],
-      **{k: [float(i) for i in v] for k, v in history.history.items() if k not in ['loss', 'val_loss']},
-      'xlabel': 'Epoch',
-      'x': history.epoch,
-    }
-  
-  def _predict(self, x) -> np.ndarray:
-    return self.mlp.predict(x, verbose = self._verbosity_level).flatten()
-  
-  def _save(self, path) -> None:
-    self.mlp.save(path/'model')
+    self.nn = keras.models.Sequential()
+    self.nn.add(keras.Input(shape = input))
+    for i, u in enumerate(recurrent_layers):
+      l = keras.layers.LSTM(u, return_sequences = i < len(recurrent_layers) - 1)
+      self.nn.add(keras.layers.Bidirectional(l) if bidirectional is True else l)
+    for u in dense_layers:
+      self.nn.add(keras.layers.Dense(u, 'relu'))
+    self.nn.add(keras.layers.Dense(1))
 
-  @property
-  def mlp(self):
-    return self._mlp
+    self.nn.compile(optimizer = optimizer, loss = 'mse')
