@@ -79,6 +79,7 @@ def load_profiles(
   datasets: str | Sequence[config.dataset_t] = config.datasets,
   particles: config.particle_t | Sequence[config.particle_t] = config.particles,
   xfirst: bool = False,
+  nmax_rescale: bool = False,
   norm: bool = False,
   nshowers: int | Mapping[config.dataset_t, int] | None = None,
   verbose: bool = False,
@@ -102,6 +103,13 @@ def load_profiles(
     if xfirst is True:
       xfdata = util.hdf_load(f'{datadir}/xfirst/{d}', particles, nshowers[d])
       profiles[d] = profiles[d].join(xfdata)
+
+  if nmax_rescale:
+    for d in datasets:
+      m = profiles[d][depths.index].max(axis = 1)
+      m.name = 'Nmx'
+      profiles[d][depths.index] = profiles[d][depths.index].div(m, axis = 0)
+      profiles[d] = profiles[d].join(m)
 
   if norm is True:
     profiles = normalize(profiles, depths.index)
