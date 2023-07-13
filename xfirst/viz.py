@@ -17,7 +17,8 @@ def draw_fit_parameters(
   pallete: str = 'rocket',
   nbins: int = 50,
   annot: bool = True,
-  limits: dict[str, tuple[float, float]] | None = None
+  limits: dict[str, tuple[float, float]] | None = None,
+  logy: bool = True,
 ) -> matplotlib.figure.Figure:
   
   if hasattr(data.index, 'levels'):
@@ -36,7 +37,7 @@ def draw_fit_parameters(
     fig = axes[0].figure
 
   labels = {
-    'lgNmax': '$\log_{10}\\left(\\frac{N_\mathrm{max}}{\mathrm{GeV}\, \mathrm{g}^{-1}\, \mathrm{cm}^2}\\right)$',
+    'lgNmax': '$\log\\left(\\frac{N_\mathrm{max}}{\mathrm{GeV}\, \mathrm{g}^{-1}\, \mathrm{cm}^2}\\right)$',
       'Xmax': '$X_\mathrm{max}$ [g cm$^{-2}$]',
          'L': 'L [g cm$^{-2}$]',
          'R': 'R',
@@ -45,15 +46,15 @@ def draw_fit_parameters(
 
   scales = {
     'lgNmax': 'linear',
-      'Xmax': 'log',
-         'L': 'log',
-         'R': 'log',
+      'Xmax': 'log' if all(data['Xmax'] > 0) else 'linear',
+         'L': 'log' if all(data['L'] > 0) else 'linear',
+         'R': 'log' if all(data['R'] > 0) else 'linear',
       'stat': 'log',
   }
 
   args = {
     'stacked': True,
-    'log': True,
+    'log': logy,
     'label': particles,
     'color': colors[1:],
     'edgecolor': colors[0],
@@ -99,7 +100,7 @@ def draw_fit_parameters(
     ax.set_ylabel('Count')
     annotate(values, ax)
 
-  if stat is not None:
+  if stat is True:
     ax = axes[-1]
     values, bins = compute('stat')
     ax.hist(split(values), bins = bins, **args)
