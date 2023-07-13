@@ -91,6 +91,7 @@ def load_profiles(
   nshowers = dict.fromkeys(datasets, nshowers) if isinstance(nshowers, int | None) else dict(nshowers)
 
   depths = load_depths(datadir, cut)
+  cols = list(depths.index)
 
   profiles = {}
 
@@ -98,7 +99,7 @@ def load_profiles(
   util.echo(verbose and xfirst, f'+ loading xfirst data from {pathlib.Path(f"{datadir}/xfirst").resolve()}')
 
   for d in datasets:
-    profiles[d] = util.hdf_load(profdir/d, particles, nshowers[d], depths.index)
+    profiles[d] = util.hdf_load(profdir/d, particles, nshowers[d], cols)
 
     if xfirst is True:
       xfdata = util.hdf_load(f'{datadir}/xfirst/{d}', particles, nshowers[d])
@@ -106,13 +107,14 @@ def load_profiles(
 
   if nmax_rescale:
     for d in datasets:
-      m = profiles[d][depths.index].max(axis = 1)
-      m.name = 'Nmx'
-      profiles[d][depths.index] = profiles[d][depths.index].div(m, axis = 0)
-      profiles[d] = profiles[d].join(m)
+      nmx = profiles[d][cols].max(axis = 1)
+      profiles[d][cols] = profiles[d][cols].div(nmx, axis = 0)
+      profiles[d].insert(profiles[d].shape[1], 'lgNmx', np.log(nmx))
+      
+    cols.append('lgNmx')
 
   if norm is True:
-    profiles = normalize(profiles, depths.index)
+    profiles = normalize(profiles, cols)
     
   return {**profiles, 'depths': depths}
 
