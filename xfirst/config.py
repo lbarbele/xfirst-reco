@@ -26,10 +26,16 @@ class cut():
     'C3': dict(min_depth =   0, max_depth = 1750),
   }
 
-  def __init__(self, name: str, min_depth: int, max_depth: int):
+  def __init__(self, name: str, min_depth: int, max_depth: int) -> None:
     self._name = name
     self._min_depth = min_depth
     self._max_depth = max_depth
+
+  def __repr__(self) -> str:
+    return f'{self.name}:({self.min_depth},{self.max_depth})'
+  
+  def __str__(self) -> str:
+    return self.name
 
   @staticmethod
   def count():
