@@ -79,6 +79,7 @@ def load_profiles(
   datasets: str | Sequence[config.dataset_t] = config.datasets,
   particles: config.particle_t | Sequence[config.particle_t] = config.particles,
   xfirst: bool = False,
+  fits: str | Sequence[str] | None = None,
   nmax_rescale: bool = False,
   norm: bool = False,
   nshowers: int | Mapping[config.dataset_t, int] | None = None,
@@ -91,7 +92,6 @@ def load_profiles(
   nshowers = dict.fromkeys(datasets, nshowers) if isinstance(nshowers, int | None) else dict(nshowers)
 
   depths = load_depths(datadir, cut)
-  cols = list(depths.index)
 
   profiles = {}
 
@@ -99,22 +99,27 @@ def load_profiles(
   util.echo(verbose and xfirst, f'+ loading xfirst data from {pathlib.Path(f"{datadir}/xfirst").resolve()}')
 
   for d in datasets:
-    profiles[d] = util.hdf_load(profdir/d, particles, nshowers[d], cols)
+    profiles[d] = util.hdf_load(profdir/d, particles, nshowers[d], depths.index)
+
+    if fits is not None:
+      fitsdata = util.hdf_load(cut.path(f'{datadir}/fits')/d, particles, nshowers[d], fits)
+      profiles[d] = profiles[d].join(fitsdata)
 
     if xfirst is True:
       xfdata = util.hdf_load(f'{datadir}/xfirst/{d}', particles, nshowers[d])
       profiles[d] = profiles[d].join(xfdata)
 
-  if nmax_rescale:
+  if nmax_rescale is True:
     for d in datasets:
-      nmx = profiles[d][cols].max(axis = 1)
-      profiles[d][cols] = profiles[d][cols].div(nmx, axis = 0)
+      nmx = profiles[d][depths.index].max(axis = 1)
+      profiles[d][depths.index] = profiles[d][depths.index].div(nmx, axis = 0)
       profiles[d].insert(profiles[d].shape[1], 'lgNmx', np.log(nmx))
-      
-    cols.append('lgNmx')
 
   if norm is True:
-    profiles = normalize(profiles, cols)
+    norm = list(depths.index)
+    if nmax_rescale is True: norm += ['lgNmx']
+    if fits is not None: norm += util.strlist(fits)
+    profiles = normalize(profiles, norm)
     
   return {**profiles, 'depths': depths}
 
