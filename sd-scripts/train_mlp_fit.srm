@@ -10,7 +10,7 @@
 #SBATCH         --error /dev/null #? do not change
 #SBATCH     --exclusive           #? do not change
 
-# parse specification of hidden layers from input                                                                                                                                                               
+# parse specification of hidden layers from input
 layers=${1?'missing specification of the hidden layers'}
 layers=$(echo ${layers} | sed 's/[,.\/:]/-/g')
 
