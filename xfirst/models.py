@@ -18,6 +18,43 @@ from . import util
 from . import viz
 
 # *
+# * helper functions
+# *
+
+def get_keras_callbacks(
+  early_stopping: int | None = 35,
+  reduce_lr: int | None = 10,
+  verbose: bool = True
+) -> list[keras.callbacks.Callback]:
+  callbacks = []
+
+  if early_stopping is not None:
+    callbacks.append(
+      keras.callbacks.EarlyStopping(
+        monitor = 'val_loss',
+        patience = early_stopping,
+        verbose = verbose,
+        min_delta = 1e-7,
+        mode = 'min',
+        restore_best_weights = True
+      )
+    )
+
+  if reduce_lr is not None:
+    callbacks.append(
+      keras.callbacks.ReduceLROnPlateau(
+        monitor = 'val_loss',
+        factor = 0.1,
+        patience = reduce_lr,
+        verbose = verbose,
+        mode = 'min',
+        min_delta = 1e-5,
+      )
+    )
+
+  return callbacks
+
+# *
 # * model interface
 # *
 
@@ -231,8 +268,6 @@ class multilayer_perceptron_regressor(model):
     optimizer: str = 'adam',
     batch_size: int = 32,
     epochs: int = 1000,
-    early_stopping: int | None = 35,
-    reduce_lr: int | None = 10,
   ) -> None:
     
     super().__init__(verbose = verbose)
@@ -246,35 +281,9 @@ class multilayer_perceptron_regressor(model):
     mlp = keras.Sequential(layers)
     mlp.compile(optimizer = optimizer, loss = 'mse')
 
-    callbacks = []
-
-    if early_stopping is not None:
-      callbacks.append(
-        keras.callbacks.EarlyStopping(
-          monitor = 'val_loss',
-          patience = early_stopping,
-          verbose = verbose,
-          min_delta = 1e-7,
-          mode = 'min',
-          restore_best_weights = True
-        )
-      )
-
-    if reduce_lr is not None:
-      callbacks.append(
-        keras.callbacks.ReduceLROnPlateau(
-          monitor = 'val_loss',
-          factor = 0.1,
-          patience = reduce_lr,
-          verbose = verbose,
-          mode = 'min',
-          min_delta = 1e-5,
-        )
-      )
-
     self._batch_size = batch_size
     self._epochs = epochs
-    self._callbacks = callbacks
+    self._callbacks = get_keras_callbacks(verbose = verbose)
     self._mlp = mlp
     self._verbosity_level = int(self.verbose) * (2 - int(util.interactive()))
 
