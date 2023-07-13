@@ -205,7 +205,7 @@ class gradient_boosting_regressor(model):
       'loss': m.evals_result()['validation_0']['rmse'],
       'val_loss': m.evals_result()['validation_1']['rmse'],
       'xlabel': '$n_\mathrm{trees}$',
-      'x': np.arange(m.get_booster().num_boosted_rounds()) + 1
+      'x': [i+1 for i in range(m.get_booster().num_boosted_rounds())]
     }
 
   def _predict(self, x) -> np.ndarray:
