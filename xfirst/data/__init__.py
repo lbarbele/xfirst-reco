@@ -81,9 +81,8 @@ def load_profiles(
   xfirst: bool = False,
   norm: bool = False,
   nshowers: int | Mapping[config.dataset_t, int] | None = None,
+  verbose: bool = False,
 ) -> dict[config.dataset_t, np.ndarray] | pd.DataFrame:
-  
-  # helper function to retrieve depths
   
   profdir = pathlib.Path(datadir).resolve()/'profiles'
   datasets = util.strlist(datasets)
@@ -93,6 +92,10 @@ def load_profiles(
   depths = load_depths(datadir, cut)
 
   profiles = {}
+
+  util.echo(verbose, f'+ loading profiles of {datasets} datasets from {profdir}')
+  util.echo(verbose and xfirst, f'+ loading xfirst data from {pathlib.Path(f"{datadir}/xfirst").resolve()}')
+
   for d in datasets:
     profiles[d] = util.hdf_load(profdir/d, particles, nshowers[d], depths.index)
 
