@@ -1,7 +1,7 @@
 import abc
 import os
 import pathlib
-from typing import Iterable, Self, Sequence
+from typing import Any, Iterable, Self, Sequence
 
 import keras
 import keras.callbacks
@@ -61,16 +61,24 @@ def get_keras_callbacks(
 class model(abc.ABC):
   def __init__(
     self,
+    backend: Any,
+    cfg: dict = {}, 
     verbose: bool = False,
   ) -> None:
     
-    self._cfg = {}
+    self._backend = backend
+    self._cfg = cfg
+    self._verbose = verbose
+
     self._features = None
     self._history = None
     self._target = None
-    self._verbose = verbose
 
   # properties: common to all models
+
+  @property
+  def backend(self):
+    return self._backend
 
   @property
   def cfg(self):
@@ -110,6 +118,9 @@ class model(abc.ABC):
 
   # draw validation curve
   def draw(self, ax: matplotlib.axes.Axes | None = None) -> matplotlib.figure.Figure:
+
+    if self.history is None:
+      raise RuntimeError('model.draw: model history empty, did you call fit before?')
 
     if ax is None:
       fig = matplotlib.pyplot.figure()
@@ -169,7 +180,7 @@ class model(abc.ABC):
 
   # fit model
   def fit(self, data: config.datadict_t, x: str | Sequence[str], y: str) -> Self:
-    
+
     self._features = x
     self._target = y
 
@@ -222,24 +233,25 @@ class model(abc.ABC):
 class neural_network(model):
   def __init__(
     self,
+    backend: Any,
+    cfg: dict = {},
     batch_size: int = 32,
     epochs: int = 1000,
     verbose: bool = True,
   ) -> None:
-    
-    super().__init__(verbose = verbose)
 
-    self.cfg['batch_size'] = batch_size
+    cfg = {'batch_size': batch_size}
 
     self._batch_size = batch_size
     self._callbacks = get_keras_callbacks(verbose = verbose)
     self._epochs = epochs
-    self._verbosity_level = int(self.verbose) * (2 - int(util.interactive()))
-    self._model = None
+    self._verbosity_level = int(verbose) * (2 - int(util.interactive()))
+
+    super().__init__(backend = backend, cfg = cfg, verbose = verbose)
 
   def _fit(self, train, validation) -> None:
 
-    history = self.nn.fit(
+    history = self.backend.fit(
       x = train[0],
       y = train[1],
       batch_size = self._batch_size,
@@ -260,37 +272,37 @@ class neural_network(model):
     return history
   
   def _predict(self, x) -> np.ndarray:
-    return self.nn.predict(x, verbose = self._verbosity_level).flatten()
+    return self.backend.predict(x, verbose = self._verbosity_level).flatten()
   
   def _save(self, path) -> None:
-    self.nn.save(path/'model')
-
-  @property
-  def nn(self):
-    return self._model
-  
-  @nn.setter
-  def nn(self, value: keras.Model):
-    self._model = value
+    self.backend.save(path/'model')
 
 # *
 # * XGboost wrapper
 # *
 
 class gradient_boosting_regressor(model):
-  def __init__(self, verbose: bool = True, **kwargs) -> None:
+  def __init__(
+      self, 
+      n_estimators: int = 1000,
+      n_jobs: int = os.cpu_count(),
+      early_stopping_rounds: int = 7,
+      verbose: bool = True, 
+      **kwargs
+    ) -> None:
     
-    super().__init__(verbose = verbose)
-    
-    kwargs.setdefault('n_estimators', 1000)
-    kwargs.setdefault('n_jobs', os.cpu_count())
-    kwargs.setdefault('early_stopping_rounds', 7)
+    xgb = xgboost.XGBRegressor(
+      n_estimators = n_estimators,
+      n_jobs = n_jobs,
+      early_stopping_rounds = early_stopping_rounds,
+      **kwargs
+    )
 
-    self._xgb = xgboost.XGBRegressor(**kwargs)
+    super().__init__(backend = xgb, verbose = verbose)
 
   def _fit(self, train, validation) -> dict:
     
-    m = self.xgb.fit(*train, eval_set = [train, validation], verbose = self.verbose)
+    m = self.backend.fit(*train, eval_set = [train, validation], verbose = self.verbose)
 
     return {
       'loss': m.evals_result()['validation_0']['rmse'],
@@ -300,15 +312,11 @@ class gradient_boosting_regressor(model):
     }
 
   def _predict(self, x) -> np.ndarray:
-    return self.xgb.predict(x)
+    return self.backend.predict(x)
   
   def _save(self, path) -> None:
-    self.xgb.save_model(path/'model.ubj')
+    self.backend.save_model(path/'model.ubj')
 
-  @property
-  def xgb(self):
-    return self._xgb
-  
 # *
 # * mlp wrapper
 # *
@@ -324,14 +332,15 @@ class multilayer_perceptron_regressor(neural_network):
     verbose: bool = True,
   ) -> None:
     
-    super().__init__(batch_size, epochs, verbose)
+    mlp = keras.models.Sequential()
+    mlp.add(keras.Input(shape = input))
+    for u in layers:
+      mlp.add(keras.layers.Dense(u, 'relu'))
+    mlp.add(keras.layers.Dense(1))
 
-    layers = [keras.layers.Dense(u, 'relu') for u in layers]
-    layers.insert(0, keras.Input(shape = input))
-    layers.append(keras.layers.Dense(1))
+    mlp.compile(optimizer = optimizer, loss = 'mse')
 
-    self.nn = keras.Sequential(layers)
-    self.nn.compile(optimizer = optimizer, loss = 'mse')
+    super().__init__(backend = mlp, batch_size = batch_size, epochs = epochs, verbose = verbose)
 
 class recurrent_network(neural_network):
   def __init__(
@@ -344,17 +353,17 @@ class recurrent_network(neural_network):
     batch_size: int = 32,
     epochs: int = 1000,
     verbose: bool = True,
-  ):
+  ) -> None:
     
-    super().__init__(batch_size, epochs, verbose)
-
-    self.nn = keras.models.Sequential()
-    self.nn.add(keras.Input(shape = input))
+    rnn = keras.models.Sequential()
+    rnn.add(keras.Input(shape = input))
     for i, u in enumerate(recurrent_layers):
       l = keras.layers.LSTM(u, return_sequences = i < len(recurrent_layers) - 1)
-      self.nn.add(keras.layers.Bidirectional(l) if bidirectional is True else l)
+      rnn.add(keras.layers.Bidirectional(l) if bidirectional is True else l)
     for u in dense_layers:
-      self.nn.add(keras.layers.Dense(u, 'relu'))
-    self.nn.add(keras.layers.Dense(1))
+      rnn.add(keras.layers.Dense(u, 'relu'))
+    rnn.add(keras.layers.Dense(1))
 
-    self.nn.compile(optimizer = optimizer, loss = 'mse')
+    rnn.compile(optimizer = optimizer, loss = 'mse')
+
+    super().__init__(backend = rnn, batch_size = batch_size, epochs = epochs, verbose = verbose)
