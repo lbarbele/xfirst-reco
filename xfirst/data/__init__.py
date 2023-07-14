@@ -105,7 +105,7 @@ def load_profiles(
   util.echo(verbose and any(drop_bad.values()), f'+ dropping profiles with bad fits from {[d for d, v in drop_bad.items() if v is True]} datasets')
 
   for d in datasets:
-    if (drop_bad[d] is True) and (nshowers[d] is not None):
+    if (any(drop_bad.values()) is True) and (nshowers[d] is not None):
       profdata = []
 
       for p in particles:
@@ -122,8 +122,12 @@ def load_profiles(
           xfdata = util.hdf_load(xfirstdir/d, p, nrows)
           data = data.join(xfdata)
 
-        badindices = data.index[status[:nrows] < 0.99]
-        data.drop(badindices, inplace = True)
+        if drop_bad[d] is True:
+          badindices = data.index[status[:nrows] < 0.99]
+          data.drop(badindices, inplace = True)
+        else:
+          data = data.join(status[:nrows])
+
         profdata.append(data)
 
       profiles[d] = pd.concat(profdata, keys = particles, copy = False)
@@ -156,6 +160,7 @@ def load_profiles(
     norm = list(depths.index)
     if nmax_rescale is True: norm += ['lgNmx']
     if fits is not None: norm += util.strlist(fits)
+    util.echo(True, f'+ normalizing columns {norm}')
     profiles = normalize(profiles, norm)
     
   return {**profiles, 'depths': depths}
@@ -185,10 +190,11 @@ def load_fits(
 
   util.echo(verbose, f'+ loading fits of {datasets} datasets from {path}')
   util.echo(verbose and xfirst, f'+ loading xfirst data from {pathlib.Path(f"{datadir}/xfirst").resolve()}')
+  util.echo(verbose and any(drop_bad.values()), f'+ dropping bad fits from {[d for d, v in drop_bad.items() if v is True]} datasets')
 
   for d in datasets:
 
-    if drop_bad[d] is True and nshowers[d] is not None:
+    if (any(drop_bad.values()) is True) and (nshowers[d] is not None):
       fitsdata = []
 
       for p in particles:
@@ -200,8 +206,12 @@ def load_fits(
           xfdata = util.hdf_load(f'{datadir}/xfirst/{d}', key = p, nrows = nrows)
           data = data.join(xfdata)
 
-        badindices = data.index[status[:nrows] < 0.99]
-        data.drop(badindices, inplace = True)
+        if drop_bad[d] is True:
+          badindices = data.index[status[:nrows] < 0.99]
+          data.drop(badindices, inplace = True)
+        else:
+          data = data.join(status[:nrows])
+
         fitsdata.append(data)
 
       fits[d] = pd.concat(fitsdata, keys = particles, copy = False)
@@ -220,6 +230,7 @@ def load_fits(
         fits[d] = fits[d].join(status)
 
   if norm is not None:
+    util.echo(True, f'+ normalizing columns {norm}')
     fits = normalize(fits, norm)
 
   return util.collapse(fits)
