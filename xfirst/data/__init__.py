@@ -80,6 +80,7 @@ def load_profiles(
   particles: config.particle_t | Sequence[config.particle_t] = config.particles,
   xfirst: bool = False,
   fits: str | Sequence[str] | None = None,
+  drop_bad: bool | Mapping[config.dataset_t, bool] = False,
   nmax_rescale: bool = False,
   norm: bool = False,
   nshowers: int | Mapping[config.dataset_t, int] | None = None,
@@ -87,8 +88,11 @@ def load_profiles(
 ) -> dict[config.dataset_t, np.ndarray] | pd.DataFrame:
   
   profdir = pathlib.Path(datadir).resolve()/'profiles'
+  fitsdir = config.cut.get(cut).path(f'{datadir}/fits')
+  xfirstdir = pathlib.Path(f"{datadir}/xfirst").resolve()
   datasets = util.strlist(datasets)
   particles = util.strlist(particles)
+  drop_bad = dict.fromkeys(datasets, drop_bad) if isinstance(drop_bad, bool) else dict(drop_bad)
   nshowers = dict.fromkeys(datasets, nshowers) if isinstance(nshowers, int | None) else dict(nshowers)
 
   depths = load_depths(datadir, cut)
@@ -96,18 +100,51 @@ def load_profiles(
   profiles = {}
 
   util.echo(verbose, f'+ loading profiles of {datasets} datasets from {profdir}')
-  util.echo(verbose and xfirst, f'+ loading xfirst data from {pathlib.Path(f"{datadir}/xfirst").resolve()}')
+  util.echo(verbose and xfirst, f'+ loading xfirst data from {xfirstdir}')
+  util.echo(verbose and fits, f'+ loading profile fits from {fitsdir}')
+  util.echo(verbose and any(drop_bad.values()), f'+ dropping profiles with bad fits from {[d for d, v in drop_bad.items() if v is True]} datasets')
 
   for d in datasets:
-    profiles[d] = util.hdf_load(profdir/d, particles, nshowers[d], depths.index)
+    if (drop_bad[d] is True) and (nshowers[d] is not None):
+      profdata = []
 
-    if fits is not None:
-      fitsdata = util.hdf_load(cut.path(f'{datadir}/fits')/d, particles, nshowers[d], fits)
-      profiles[d] = profiles[d].join(fitsdata)
+      for p in particles:
+        status = util.hdf_load(fitsdir/d, key = p, columns = 'status').status
+        nrows = status[status > 0.99].index[nshowers[d]]
 
-    if xfirst is True:
-      xfdata = util.hdf_load(f'{datadir}/xfirst/{d}', particles, nshowers[d])
-      profiles[d] = profiles[d].join(xfdata)
+        data = util.hdf_load(profdir/d, p, nrows, depths.index)
+
+        if fits is not None:
+          fitsdata = util.hdf_load(fitsdir/d, p, nrows, fits)
+          data = data.join(fitsdata)
+
+        if xfirst is True:
+          xfdata = util.hdf_load(xfirstdir/d, p, nrows)
+          data = data.join(xfdata)
+
+        badindices = data.index[status[:nrows] < 0.99]
+        data.drop(badindices, inplace = True)
+        profdata.append(data)
+
+      profiles[d] = pd.concat(profdata, keys = particles, copy = False)
+
+    else:
+      profiles[d] = util.hdf_load(profdir/d, particles, nshowers[d], depths.index)
+
+      if fits is not None:
+        fitsdata = util.hdf_load(fitsdir/d, particles, nshowers[d], fits)
+        profiles[d] = profiles[d].join(fitsdata)
+
+      if xfirst is True:
+        xfdata = util.hdf_load(xfirstdir/d, particles, nshowers[d])
+        profiles[d] = profiles[d].join(xfdata)
+
+      if drop_bad[d] is True:
+        status = util.hdf_load(fitsdir/d, key = particles, columns = 'status').status
+        profiles[d].drop(profiles[d].index[status < 0.99], inplace = True)
+      elif any(drop_bad.values()) and (fits is None or 'status' not in fits):
+        status = util.hdf_load(fitsdir/d, key = particles, nrows = nshowers[d], columns = 'status')
+        profiles[d] = profiles[d].join(status)
 
   if nmax_rescale is True:
     for d in datasets:
@@ -170,15 +207,16 @@ def load_fits(
       fits[d] = pd.concat(fitsdata, keys = particles, copy = False)
     else:
       fits[d] = util.hdf_load(f'{path}/{d}', key = particles, columns = columns, nrows = nshowers[d])
+
       if xfirst is True:
         xfdata = util.hdf_load(f'{datadir}/xfirst/{d}', key = particles, nrows = nshowers[d])
         fits[d] = fits[d].join(xfdata)
 
       if drop_bad[d] is True:
         status = util.hdf_load(f'{path}/{d}', key = particles, columns = 'status').status
-        fits[d].drop(fits.index[status < 0.99], inplace = True)
+        fits[d].drop(fits[d].index[status < 0.99], inplace = True)
       elif any(drop_bad.values()) and columns is not None and not 'status' in columns:
-        status = util.hdf_load(f'{path}/{d}', key = particles, columns = 'status')
+        status = util.hdf_load(f'{path}/{d}', key = particles, nrows = nshowers[d], columns = 'status')
         fits[d] = fits[d].join(status)
 
   if norm is not None:
