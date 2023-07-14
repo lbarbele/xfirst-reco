@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH      --job-name mlpprof
+#SBATCH      --job-name mlpboth
 #SBATCH         --nodes 1
 #SBATCH --cpus-per-task 48
 #SBATCH     --partition sequana_cpu,sequana_cpu_shared,sequana_cpu_long
@@ -18,7 +18,7 @@ layers=$(echo ${layers} | sed 's/[,.\/:]/-/g')
 cut=${2?'missing specification of the depth cut range'}
 
 # set job name
-export RENAME_JOB="mlp-prof-${cut}-${layers}"
+export RENAME_JOB="mlp-both-${cut}-${layers}"
 
 source /scratch/astroparti/luan.arbeletche/ml-conex-xfirst/sd-scripts/prepare_env.sh
 
