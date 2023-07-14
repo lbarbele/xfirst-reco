@@ -392,5 +392,5 @@ class recurrent_network(neural_network):
 # * model loader
 # *
 
-def load(path: str | os.PathLike) -> model:
-  return model.load(path)
+def load(path: str | os.PathLike, verbose: bool = True) -> model:
+  return model.load(path, verbose)
