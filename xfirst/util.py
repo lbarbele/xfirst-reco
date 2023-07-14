@@ -47,7 +47,10 @@ def split(data: Sequence[Any], *, batches: int) -> list[Sequence[Any]]:
 @overload
 def split(data: Sequence[Any], *, map_sizes: Mapping[Any, int]) -> Mapping[Any, Sequence[Any]]:
   ...
-def split(data, *, indices = None, sizes = None, batches = None, map_sizes = None):
+@overload
+def split(data: Sequence[Any], *, batch_size: int) -> list[Sequence[Any]]:
+  ...
+def split(data, *, indices = None, sizes = None, batches = None, map_sizes = None, batch_size = None):
   args = {k: v for k, v in locals().items() if k != 'data'}
 
   if len([v for v in args.values() if v is not None]) != 1:
@@ -92,6 +95,10 @@ def split(data, *, indices = None, sizes = None, batches = None, map_sizes = Non
   elif map_sizes is not None:
 
     return dict(zip(map_sizes.keys(), split(data, sizes = map_sizes.values())))
+  
+  elif batch_size is not None:
+
+    return split(data, indices = [(1+i)*batch_size for i in range(len(data)//batch_size)])
 
   raise RuntimeError('split: unexpected error')
 
