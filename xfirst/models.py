@@ -1,4 +1,5 @@
 import abc
+import collections
 import os
 import pathlib
 from typing import Any, Iterable, Self, Sequence
@@ -6,6 +7,7 @@ from typing import Any, Iterable, Self, Sequence
 import keras
 import keras.callbacks
 import keras.layers
+import keras.utils
 import matplotlib.axes
 import matplotlib.figure
 import matplotlib.pyplot
@@ -357,7 +359,7 @@ class multilayer_perceptron_regressor(neural_network):
       mlp.add(keras.layers.Dense(u, 'relu'))
     mlp.add(keras.layers.Dense(1))
 
-    mlp.compile(optimizer = optimizer, loss = 'mse')
+    mlp.compile(optimizer = optimizer, loss = 'mse', jit_compile = True)
 
     super().__init__(backend = mlp, batch_size = batch_size, epochs = epochs, verbose = verbose)
 
@@ -384,9 +386,45 @@ class recurrent_network(neural_network):
       rnn.add(keras.layers.Dense(u, 'relu'))
     rnn.add(keras.layers.Dense(1))
 
-    rnn.compile(optimizer = optimizer, loss = 'mse')
+    rnn.compile(optimizer = optimizer, loss = 'mse', jit_compile = True)
 
     super().__init__(backend = rnn, batch_size = batch_size, epochs = epochs, verbose = verbose)
+
+class convolutional_network(neural_network):
+  layer = collections.namedtuple('convolutional_network_layer', ('filters', 'kernel', 'pooling'))
+
+  def __init__(
+    self,
+    input: tuple[int | None, int],
+    conv_layers: Iterable[tuple[int, int, int | None] | layer],
+    dense_layers: Iterable[int] = [],
+    *,
+    optimizer: str = 'adam',
+    batch_size: int = 32,
+    epochs: int = 1000,
+    verbose: bool = True,
+  ) -> None:
+    
+    cnn = keras.models.Sequential()
+    # input
+    cnn.add(keras.layers.Input(shape = input))
+    # convolutions + optional max pooling after each layer
+    for l in conv_layers:
+      l = convolutional_network.layer(*l)
+      cnn.add(keras.layers.Conv1D(l.filters, l.kernel, activation = 'relu'))
+      if l.pooling is not None:
+        cnn.add(keras.layers.MaxPooling1D(l.pooling))
+    # global pooling
+    cnn.add(keras.layers.GlobalAveragePooling1D())
+    # dense layers
+    for u in dense_layers:
+      cnn.add(keras.layers.Dense(u, 'relu'))
+    # output
+    cnn.add(keras.layers.Dense(1))
+
+    cnn.compile(optimizer = optimizer, loss = 'mse', jit_compile = True)
+
+    super().__init__(backend = cnn, batch_size = batch_size, epochs = epochs, verbose = verbose)
 
 # *
 # * model loader
