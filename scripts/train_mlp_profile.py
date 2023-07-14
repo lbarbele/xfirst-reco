@@ -12,6 +12,7 @@ import xfirst
 @click.option('--cut', type = str, required = True)
 @click.option('--save', type = click.Path(), required = False, default = None)
 @click.option('--nshowers', type = (str, click.IntRange(1, None)), required = True, multiple = True)
+@click.option('--fits/--no-fits', default = False)
 @click.option('--verbose/--no-verbose', default = True)
 def main(
   datadir: str | os.PathLike,
@@ -19,13 +20,16 @@ def main(
   cut: str,
   save: str | os.PathLike | None = None,
   nshowers: Mapping[xfirst.config.dataset_t, int] | int | None = None,
+  fits: bool = False,
   verbose: bool = True,
 ):
   
   layers = [int(i) for i in re.sub(',|-|\.|\/', ':', layers).split(':')]
   cut = xfirst.config.cut.get(cut)
 
-  x = xfirst.data.load_depths(datadir, cut).index.to_list()
+  x_prof = xfirst.data.load_depths(datadir, cut).index.to_list()
+  x_fits = xfirst.profile_functions.usp().parameter_names if (fits is True) else []
+  x = x_prof + x_fits
   y = 'Xfirst'
 
   xfirst.util.echo(verbose, f'processing profiles from cut {cut.name}')
@@ -36,6 +40,8 @@ def main(
     nshowers = nshowers,
     norm     = True,
     xfirst   = True,
+    fits     = x_fits if (fits is True) else None,
+    drop_bad = {'train': True, 'validation': True, 'test': False},
     verbose  = verbose,
   )
 
