@@ -22,6 +22,13 @@ from . import viz
 # *
 
 class model(abc.ABC):
+  implementations = {}
+
+  @classmethod
+  def __init_subclass__(cls, **kwargs):
+    super().__init_subclass__(**kwargs)
+    model.implementations[cls.__name__] = cls
+
   def __init__(
     self,
     backend: Any,
@@ -159,6 +166,7 @@ class model(abc.ABC):
 
     train = (data['train'][x], data['train'][y])
     valid = (data['validation'][x], data['validation'][y])
+
     self._history = self._fit(train, valid)
 
     return self
@@ -172,7 +180,7 @@ class model(abc.ABC):
     # if called from base model interface, read class name from config.json
     if cls is model:
       name = util.json_load(path/'config.json')['name']
-      cls = globals()[name].load(path)
+      cls = model.implementations[name]
     
     m = cls._load(path)
     m._cfg = util.json_load(path/'config.json')
@@ -229,25 +237,20 @@ class neural_network(model):
     verbose: bool = True,
   ) -> None:
 
-    # TODO move this to fit method
-    callbacks = []
-    early_stopping = 35
-    reduce_lr = 10
-    if early_stopping is not None:
-      callbacks.append(keras.callbacks.EarlyStopping(patience = early_stopping, verbose = verbose, restore_best_weights = True))
-    if reduce_lr is not None:
-      callbacks.append(keras.callbacks.ReduceLROnPlateau(patience = reduce_lr, verbose = verbose))
-
     cfg = {'batch_size': batch_size}
 
     self._batch_size = batch_size
-    self._callbacks = callbacks
     self._epochs = epochs
-    self._verbosity_level = int(verbose) * (2 - int(util.interactive()))
+    self._verbosity_level = verbose * (2 - util.interactive())
 
     super().__init__(backend = backend, cfg = cfg, verbose = verbose)
 
   def _fit(self, train, validation) -> None:
+
+    callbacks = [
+      keras.callbacks.EarlyStopping(patience = 35, verbose = self.verbose, restore_best_weights = True),
+      keras.callbacks.ReduceLROnPlateau(patience = 10, verbose = self.verbose)
+    ]
 
     keras_history = self.backend.fit(
       x = train[0],
@@ -255,7 +258,7 @@ class neural_network(model):
       batch_size = self._batch_size,
       epochs = self._epochs,
       verbose = self._verbosity_level,
-      callbacks = self._callbacks,
+      callbacks = callbacks,
       validation_data = validation,
     )
 
@@ -290,7 +293,8 @@ class neural_network(model):
 
 class gradient_boosting_regressor(model):
   def __init__(
-      self, 
+      self,
+      *,
       n_estimators: int = 1000,
       n_jobs: int = os.cpu_count(),
       early_stopping_rounds: int = 7,
@@ -340,6 +344,7 @@ class multilayer_perceptron_regressor(neural_network):
     self,
     input: int,
     layers: Iterable[int],
+    *,
     optimizer: str = 'adam',
     batch_size: int = 32,
     epochs: int = 1000,
@@ -359,9 +364,10 @@ class multilayer_perceptron_regressor(neural_network):
 class recurrent_network(neural_network):
   def __init__(
     self,
-    input: tuple[int, int],
-    recurrent_layers: Sequence[int],
-    dense_layers: Sequence[int],
+    input: tuple[int | None, int],
+    recurrent_layers: Iterable[int],
+    dense_layers: Iterable[int],
+    *,
     bidirectional: bool = False,
     optimizer: str = 'adam',
     batch_size: int = 32,
