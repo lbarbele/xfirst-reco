@@ -25,7 +25,7 @@ def main(
   layers = [int(i) for i in re.sub(',|-|\.|\/', ':', layers).split(':')]
   cut = xfirst.config.cut.get(cut)
 
-  x = xfirst.data.load_depths('data', cut).index.to_list()
+  x = xfirst.data.load_depths(datadir, cut).index.to_list()
   y = 'Xfirst'
 
   xfirst.util.echo(verbose, f'processing profiles from cut {cut.name}')
