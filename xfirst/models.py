@@ -18,43 +18,6 @@ from . import util
 from . import viz
 
 # *
-# * helper functions
-# *
-
-def get_keras_callbacks(
-  early_stopping: int | None = 35,
-  reduce_lr: int | None = 10,
-  verbose: bool = True
-) -> list[keras.callbacks.Callback]:
-  callbacks = []
-
-  if early_stopping is not None:
-    callbacks.append(
-      keras.callbacks.EarlyStopping(
-        monitor = 'val_loss',
-        patience = early_stopping,
-        verbose = verbose,
-        min_delta = 1e-7,
-        mode = 'min',
-        restore_best_weights = True
-      )
-    )
-
-  if reduce_lr is not None:
-    callbacks.append(
-      keras.callbacks.ReduceLROnPlateau(
-        monitor = 'val_loss',
-        factor = 0.1,
-        patience = reduce_lr,
-        verbose = verbose,
-        mode = 'min',
-        min_delta = 1e-5,
-      )
-    )
-
-  return callbacks
-
-# *
 # * model interfaces
 # *
 
@@ -104,6 +67,11 @@ class model(abc.ABC):
 
   @abc.abstractmethod
   def _fit(self, train: tuple[pd.DataFrame, pd.Series], validation: tuple[pd.DataFrame, pd.Series]) -> dict:
+    ...
+
+  @staticmethod
+  @abc.abstractmethod
+  def _load(path: pathlib.Path) -> Self:
     ...
 
   @abc.abstractmethod
@@ -194,7 +162,27 @@ class model(abc.ABC):
     self._history = self._fit(train, valid)
 
     return self
-  
+
+  # load saved model
+  @classmethod
+  def load(cls, path: str | os.PathLike, verbose: bool = True) -> Self:
+
+    path = pathlib.Path(path).resolve(strict = True)
+
+    # if called from base model interface, read class name from config.json
+    if cls is model:
+      name = util.json_load(path/'config.json')['name']
+      cls = globals()[name].load(path)
+    
+    m = cls._load(path)
+    m._cfg = util.json_load(path/'config.json')
+    m._history = util.json_load(path/'history.json')
+    m._features = m.cfg['features']
+    m._target = m.cfg['target']
+    m._verbose = verbose
+
+    return m
+
   # predict on test data
   def predict(self, data: pd.DataFrame | config.datadict_t) -> np.ndarray:
     
@@ -222,10 +210,11 @@ class model(abc.ABC):
     matplotlib.pyplot.close(fig)
     util.echo(self.verbose, f'+ validation curve saved to {outdir}/validation_curve.pdf')
 
+    self._cfg['name'] = type(self).__name__
     util.json_save(self.cfg, outdir/'config')
     util.echo(self.verbose, f'+ model configuration saved to {outdir}/config.json')
 
-    util.json_save(self.history, path/'history')
+    util.json_save(self.history, outdir/'history')
     util.echo(self.verbose, f'+ training history saved to {outdir}/history.json')
 
     return outdir
@@ -240,10 +229,19 @@ class neural_network(model):
     verbose: bool = True,
   ) -> None:
 
+    # TODO move this to fit method
+    callbacks = []
+    early_stopping = 35
+    reduce_lr = 10
+    if early_stopping is not None:
+      callbacks.append(keras.callbacks.EarlyStopping(patience = early_stopping, verbose = verbose, restore_best_weights = True))
+    if reduce_lr is not None:
+      callbacks.append(keras.callbacks.ReduceLROnPlateau(patience = reduce_lr, verbose = verbose))
+
     cfg = {'batch_size': batch_size}
 
     self._batch_size = batch_size
-    self._callbacks = get_keras_callbacks(verbose = verbose)
+    self._callbacks = callbacks
     self._epochs = epochs
     self._verbosity_level = int(verbose) * (2 - int(util.interactive()))
 
@@ -251,7 +249,7 @@ class neural_network(model):
 
   def _fit(self, train, validation) -> None:
 
-    history = self.backend.fit(
+    keras_history = self.backend.fit(
       x = train[0],
       y = train[1],
       batch_size = self._batch_size,
@@ -261,15 +259,24 @@ class neural_network(model):
       validation_data = validation,
     )
 
-    history = {
-      'loss': [float(i) for i in np.sqrt(history.history['loss'])],
-      'val_loss': [float(i) for i in np.sqrt(history.history['val_loss'])],
-      'xlabel': 'Epoch',
-      'x': history.epoch,
-      **{k: [float(i) for i in v] for k, v in history.history.items() if k not in ['loss', 'val_loss']},
-    }
+    history = dict()
+    history['loss'] = [float(i) for i in np.sqrt(keras_history.history['loss'])]
+    history['val_loss'] = [float(i) for i in np.sqrt(keras_history.history['val_loss'])]
+    history['xlabel'] = 'Epoch'
+    history['x'] = keras_history.epoch
+
+    for k in keras_history.history:
+      if not k in history:
+        history[k] = [float(v) for v in keras_history.history[k]]
 
     return history
+
+  @staticmethod
+  def _load(path) -> Self:
+
+    nn = keras.models.load_model(path/'model')
+    nn = neural_network(backend = nn)
+    return nn
   
   def _predict(self, x) -> np.ndarray:
     return self.backend.predict(x, verbose = self._verbosity_level).flatten()
@@ -304,12 +311,19 @@ class gradient_boosting_regressor(model):
     
     m = self.backend.fit(*train, eval_set = [train, validation], verbose = self.verbose)
 
-    return {
-      'loss': m.evals_result()['validation_0']['rmse'],
-      'val_loss': m.evals_result()['validation_1']['rmse'],
-      'xlabel': '$n_\mathrm{trees}$',
-      'x': [i+1 for i in range(m.get_booster().num_boosted_rounds())]
-    }
+    history = dict()
+    history['loss'] = m.evals_result()['validation_0']['rmse']
+    history['val_loss'] = m.evals_result()['validation_1']['rmse']
+    history['xlabel'] = '$n_\mathrm{trees}$'
+    history['x'] = [i+1 for i in range(m.get_booster().num_boosted_rounds())]
+    return history
+  
+  @staticmethod
+  def _load(path) -> Self:
+    
+    xgbmodel = gradient_boosting_regressor()
+    xgbmodel.backend.load_model(path/'model.ubj')
+    return xgbmodel
 
   def _predict(self, x) -> np.ndarray:
     return self.backend.predict(x)
@@ -367,3 +381,10 @@ class recurrent_network(neural_network):
     rnn.compile(optimizer = optimizer, loss = 'mse')
 
     super().__init__(backend = rnn, batch_size = batch_size, epochs = epochs, verbose = verbose)
+
+# *
+# * model loader
+# *
+
+def load(path: str | os.PathLike) -> model:
+  return model.load(path)
