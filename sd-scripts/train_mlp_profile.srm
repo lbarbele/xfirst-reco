@@ -10,6 +10,8 @@
 #SBATCH         --error /dev/null #? do not change
 #SBATCH     --exclusive           #? do not change
 
+source /scratch/astroparti/luan.arbeletche/ml-conex-xfirst/sd-scripts/prepare_env.sh
+
 # parse specification of hidden layers from input
 layers=${1?'missing specification of the hidden layers'}
 layers=$(echo ${layers} | sed 's/[,.\/:]/-/g')
@@ -17,10 +19,8 @@ layers=$(echo ${layers} | sed 's/[,.\/:]/-/g')
 # parse cut configuration from input
 cut=${2?'missing specification of the depth cut range'}
 
-# set job name
-export RENAME_JOB="mlp-prof-${cut}-${layers}"
-
-source /scratch/astroparti/luan.arbeletche/ml-conex-xfirst/sd-scripts/prepare_env.sh
+set_job_name "mlpp-${cut}-${layers}"
+submit "${@}"
 
 python "${SCRIPTS_DIR}/train_mlp_profile.py" \
   --datadir "${DATA_DIR}" \
