@@ -1,0 +1,10 @@
+{
+  "features": [
+    "lgNmax",
+    "Xmax",
+    "L",
+    "R"
+  ],
+  "target": "Xfirst",
+  "name": "gradient_boosting_regressor"
+}
