@@ -54,7 +54,7 @@ def main(
   if save is not None:
     model.eval(
       data = data,
-      save = cut.path(f'{save}/mlp-profile-' + '-'.join(map(str, layers))),
+      save = cut.path(f'{save}/mlp-' + ('both-' if fits else 'profile-') + '-'.join(map(str, layers))),
       plot = True
     )
 
