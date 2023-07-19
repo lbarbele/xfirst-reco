@@ -26,10 +26,13 @@ export -f set_job_name
 
 function submit() {
   [ -n "${SLURM_JOB_ID}" ] && return 0
+  local -r script=$(realpath "${0}")
+  local -r out="${LOGS_DIR}/%x_job_%J.out"
+  local -r err="${LOGS_DIR}/%x_job_%J.err"
   if [ -n "${SLURM_JOB_NAME}" ]; then
-    sbatch -J "${SLURM_JOB_NAME}" -o "${LOGS_DIR}/%x_job_%J.out" -e "${LOGS_DIR}/%x_job_%J.err" "${0}" "${@}"
+    sbatch -J "${SLURM_JOB_NAME}" -o "${out}" -e "${err}" "${script}" "${@}"
   else
-    sbatch -o "${LOGS_DIR}/%x_job_%J.out" -e "${LOGS_DIR}/%x_job_%J.err" "${0}" "${@}"
+    sbatch -o "${out}" -e "${err}" "${script}" "${@}"
   fi
   exit 0
 }
