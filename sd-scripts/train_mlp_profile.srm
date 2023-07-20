@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH      --job-name mlpprof
-#SBATCH         --nodes 1
+#SBATCH         --nodes 9
 #SBATCH --cpus-per-task 48
-#SBATCH     --partition sequana_cpu,sequana_cpu_shared,sequana_cpu_long
-#SBATCH          --time 24:00:00
+#SBATCH     --partition sequana_cpu_shared
+#SBATCH          --time 96:00:00
 #SBATCH     --mail-type ALL
 #SBATCH     --mail-user luan.arbeletche@gmail.com
 #SBATCH        --output /dev/null #? do not change
@@ -16,17 +16,23 @@ source /scratch/astroparti/luan.arbeletche/ml-conex-xfirst/sd-scripts/prepare_en
 layers=${1?'missing specification of the hidden layers'}
 layers=$(echo ${layers} | sed 's/[,.\/:]/-/g')
 
-# parse cut configuration from input
-cut=${2?'missing specification of the depth cut range'}
-
-set_job_name "mlpp-${cut}-${layers}"
+set_job_name "mlpp-${layers}"
 submit "${@}"
 
-python "${SCRIPTS_DIR}/train_mlp_profile.py" \
-  --datadir "${DATA_DIR}" \
-  --layers "${layers}" \
-  --cut "${cut}" \
-  --save "${MODELS_DIR}" \
-  --nshowers train "${NTRAIN}" \
-  --nshowers validation "${NVAL}" \
-  --nshowers test "${NTEST}"
+for cut in A1 A2 A3 B1 B2 B3 C1 C2 C3; do
+  echo "launching cut ${cut}"
+  srun -N1 -n1 -o "${LOGS_DIR}/%x_job_%J.out" -e "${LOGS_DIR}/%x_job_%J.err" \
+    python "${SCRIPTS_DIR}/train_mlp_profile.py" \
+    --datadir "${DATA_DIR}" \
+    --layers "${layers}" \
+    --cut "${cut}" \
+    --save "${MODELS_DIR}" \
+    --nshowers train "${NTRAIN}" \
+    --nshowers validation "${NVAL}" \
+    --nshowers test "${NTEST}" \
+  &
+done
+
+echo "waiting for jobs to finish"
+wait
+echo "done!"
