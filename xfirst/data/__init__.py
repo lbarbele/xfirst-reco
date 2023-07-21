@@ -115,7 +115,7 @@ def load_profiles(
         data = util.hdf_load(profdir/d, p, nrows, depths.index)
 
         if fits is not None:
-          fitsdata = util.hdf_load(fitsdir/d, p, nrows, fits)
+          fitsdata = util.hdf_load(fitsdir/d, p, nrows, fits).astype('float32')
           data = data.join(fitsdata)
 
         if xfirst is True:
@@ -126,7 +126,7 @@ def load_profiles(
           badindices = data.index[status[:nrows] < 0.99]
           data.drop(badindices, inplace = True)
         else:
-          data = data.join(status[:nrows])
+          data = data.join(status[:nrows].astype('float32'))
 
         profdata.append(data)
 
@@ -136,7 +136,7 @@ def load_profiles(
       profiles[d] = util.hdf_load(profdir/d, particles, nshowers[d], depths.index)
 
       if fits is not None:
-        fitsdata = util.hdf_load(fitsdir/d, particles, nshowers[d], fits)
+        fitsdata = util.hdf_load(fitsdir/d, particles, nshowers[d], fits).astype('float32')
         profiles[d] = profiles[d].join(fitsdata)
 
       if xfirst is True:
@@ -147,7 +147,7 @@ def load_profiles(
         status = util.hdf_load(fitsdir/d, key = particles, columns = 'status').status
         profiles[d].drop(profiles[d].index[status < 0.99], inplace = True)
       elif any(drop_bad.values()) and (fits is None or 'status' not in fits):
-        status = util.hdf_load(fitsdir/d, key = particles, nrows = nshowers[d], columns = 'status')
+        status = util.hdf_load(fitsdir/d, key = particles, nrows = nshowers[d], columns = 'status').astype('float32')
         profiles[d] = profiles[d].join(status)
 
   if nmax_rescale is True:
