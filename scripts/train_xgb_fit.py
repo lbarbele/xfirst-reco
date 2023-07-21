@@ -37,6 +37,7 @@ def main(
       xfirst   = True,
       norm     = x,
       drop_bad = {'train': True, 'validation': True, 'test': False},
+      shuffle  = {'train': True, 'validation': True, 'test': False},
       nshowers = nshowers,
       verbose  = verbose,
     )

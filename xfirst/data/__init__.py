@@ -84,6 +84,7 @@ def load_profiles(
   nmax_rescale: bool = False,
   norm: bool = False,
   nshowers: int | Mapping[config.dataset_t, int] | None = None,
+  shuffle: bool | Mapping[config.dataset_t, bool] = False,
   verbose: bool = False,
 ) -> dict[config.dataset_t, np.ndarray] | pd.DataFrame:
   
@@ -94,6 +95,7 @@ def load_profiles(
   particles = util.strlist(particles)
   drop_bad = dict.fromkeys(datasets, drop_bad) if isinstance(drop_bad, bool) else dict(drop_bad)
   nshowers = dict.fromkeys(datasets, nshowers) if isinstance(nshowers, int | None) else dict(nshowers)
+  shuffle = dict.fromkeys(datasets, shuffle) if isinstance(shuffle, bool) else dict(shuffle)
 
   depths = load_depths(datadir, cut)
 
@@ -102,6 +104,7 @@ def load_profiles(
   util.echo(verbose, f'+ loading profiles of {datasets} datasets from {profdir}')
   util.echo(verbose and xfirst, f'+ loading xfirst data from {xfirstdir}')
   util.echo(verbose and fits, f'+ loading profile fits from {fitsdir}')
+  util.echo(verbose and any(drop_bad.values()), f'+ shuffling datasets {[d for d, v in shuffle.items() if v is True]}')
   util.echo(verbose and any(drop_bad.values()), f'+ dropping profiles with bad fits from {[d for d, v in drop_bad.items() if v is True]} datasets')
 
   for d in datasets:
@@ -150,6 +153,9 @@ def load_profiles(
         status = util.hdf_load(fitsdir/d, key = particles, nrows = nshowers[d], columns = 'status').astype('float32')
         profiles[d] = profiles[d].join(status)
 
+    if shuffle[d] is True:
+      profiles[d] = profiles[d].sample(frac = 1)
+
   if nmax_rescale is True:
     for d in datasets:
       nmx = profiles[d][depths.index].max(axis = 1)
@@ -175,6 +181,7 @@ def load_fits(
   norm: str | Sequence[str] | None = None,
   drop_bad: bool | Mapping[config.dataset_t, bool] = False,
   nshowers: int | Mapping[config.dataset_t, int] | None = None,
+  shuffle: bool | Mapping[config.dataset_t, bool] = False,
   verbose: bool = False,
 ) -> pd.DataFrame | dict[config.dataset_t, pd.DataFrame]:
   
@@ -184,6 +191,7 @@ def load_fits(
   columns = util.strlist(columns)
   drop_bad = dict.fromkeys(datasets, drop_bad) if isinstance(drop_bad, bool) else dict(drop_bad)
   nshowers = dict.fromkeys(datasets, nshowers) if isinstance(nshowers, int | None) else dict(nshowers)
+  shuffle = dict.fromkeys(datasets, shuffle) if isinstance(shuffle, bool) else dict(shuffle)
   path = cut.path(f'{datadir}/fits')
 
   fits = {}
@@ -228,6 +236,9 @@ def load_fits(
       elif any(drop_bad.values()) and columns is not None and not 'status' in columns:
         status = util.hdf_load(f'{path}/{d}', key = particles, nrows = nshowers[d], columns = 'status')
         fits[d] = fits[d].join(status)
+
+    if shuffle[d] is True:
+      fits[d] = fits[d].sample(frac = 1)
 
   if norm is not None:
     util.echo(True, f'+ normalizing columns {norm}')

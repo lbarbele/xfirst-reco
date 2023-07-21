@@ -44,6 +44,7 @@ def main(
     xfirst   = True,
     fits     = x_fits if (fits is True) else None,
     drop_bad = {'train': True, 'validation': True, 'test': False},
+    shuffle  = {'train': True, 'validation': True, 'test': False},
     verbose  = verbose,
   )
 
