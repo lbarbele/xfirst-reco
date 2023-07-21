@@ -16,7 +16,7 @@ submit "${@}"
 
 for layers in '64-64-64' '32-32-32'; do
   echo "launching layer configuration ${layers}"
-  echo srun -N1 -n1 -o "${LOGS_DIR}/%x_job_%J.out" -e "${LOGS_DIR}/%x_job_%J.err" \
+  srun -N1 -n1 -o "${LOGS_DIR}/%x_job_%J.out" -e "${LOGS_DIR}/%x_job_%J.err" \
     python "${SCRIPTS_DIR}/train_mlp_fit.py" \
     --datadir "${DATA_DIR}" \
     --layers "${layers}" \
