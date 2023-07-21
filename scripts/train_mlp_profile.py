@@ -1,3 +1,5 @@
+import tensorflow
+
 import os
 import re
 from typing import Mapping
@@ -10,7 +12,7 @@ import xfirst
 @click.option('--datadir', type = click.Path(exists = True, dir_okay = True), required = True)
 @click.option('--layers', type = str, required = True)
 @click.option('--cut', type = str, required = True)
-@click.option('--batch_size', type = click.IntRange(8, 2048), required = False, default = 128)
+@click.option('--batch-size', type = click.IntRange(8, 2048), required = False, default = 128)
 @click.option('--save', type = click.Path(), required = False, default = None)
 @click.option('--nshowers', type = (str, click.IntRange(1, None)), required = True, multiple = True)
 @click.option('--fits/--no-fits', default = False)
