@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH      --job-name mlpfit
-#SBATCH         --nodes 1
+#SBATCH         --nodes 2 #? must match the number of layer configurations
 #SBATCH --cpus-per-task 48
 #SBATCH     --partition sequana_cpu_shared
 #SBATCH          --time 96:00:00
@@ -12,19 +12,15 @@
 
 source /scratch/astroparti/luan.arbeletche/ml-conex-xfirst/sd-scripts/prepare_env.sh
 
-# parse specification of hidden layers from input
-layers=${1?'missing specification of the hidden layers'}
-layers=$(echo "${layers}" | sed 's/[,.\/:]/-/g')
-
-set_job_name "mlpf-${layers}"
 submit "${@}"
 
-for cut in A1 A2 A3 B1 B2 B3 C1 C2 C3; do
-  python "${SCRIPTS_DIR}/train_mlp_fit.py" \
+for layers in '64-64-64' '32-32-32'; do
+  echo "launching layer configuration ${layers}"
+  echo srun -N1 -n1 -o "${LOGS_DIR}/%x_job_%J.out" -e "${LOGS_DIR}/%x_job_%J.err" \
+    python "${SCRIPTS_DIR}/train_mlp_fit.py" \
     --datadir "${DATA_DIR}" \
     --layers "${layers}" \
     --save "${MODELS_DIR}" \
-    --cuts "${cut}" \
     --nshowers train "${NTRAIN}" \
     --nshowers validation "${NVAL}" \
     --nshowers test "${NTEST}"
