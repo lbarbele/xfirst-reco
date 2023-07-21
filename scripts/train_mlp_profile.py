@@ -10,6 +10,7 @@ import xfirst
 @click.option('--datadir', type = click.Path(exists = True, dir_okay = True), required = True)
 @click.option('--layers', type = str, required = True)
 @click.option('--cut', type = str, required = True)
+@click.option('--batch_size', type = click.IntRange(8, 2048), required = False, default = 128)
 @click.option('--save', type = click.Path(), required = False, default = None)
 @click.option('--nshowers', type = (str, click.IntRange(1, None)), required = True, multiple = True)
 @click.option('--fits/--no-fits', default = False)
@@ -18,6 +19,7 @@ def main(
   datadir: str | os.PathLike,
   layers: str,
   cut: str,
+  batch_size: int = 128,
   save: str | os.PathLike | None = None,
   nshowers: Mapping[xfirst.config.dataset_t, int] | int | None = None,
   fits: bool = False,
@@ -49,6 +51,7 @@ def main(
     input = len(x),
     layers = layers,
     verbose = verbose,
+    batch_size = batch_size,
   ).fit(data, x, y)
 
   if save is not None:
