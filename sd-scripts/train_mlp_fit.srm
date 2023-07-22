@@ -23,5 +23,8 @@ for layers in '64-64-64' '32-32-32'; do
     --save "${MODELS_DIR}" \
     --nshowers train "${NTRAIN}" \
     --nshowers validation "${NVAL}" \
-    --nshowers test "${NTEST}"
+    --nshowers test "${NTEST}" \
+    &
 done
+
+wait
