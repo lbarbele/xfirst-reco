@@ -236,14 +236,16 @@ class neural_network(model):
     cfg: dict = {},
     batch_size: int = 32,
     epochs: int = 1000,
+    backup_dir: str | os.PathLike | None = None,
     verbose: bool = True,
   ) -> None:
 
-    cfg = {'batch_size': batch_size}
-
-    self._batch_size = batch_size
-    self._epochs = epochs
-    self._verbosity_level = verbose * (2 - util.interactive())
+    cfg = {
+      'batch_size': batch_size,
+      'epochs': epochs,
+      'verbosity': verbose * (2 - util.interactive()),
+      'backup_dir': backup_dir,
+    }
 
     super().__init__(backend = backend, cfg = cfg, verbose = verbose)
 
@@ -254,12 +256,15 @@ class neural_network(model):
       keras.callbacks.ReduceLROnPlateau(patience = 10, verbose = self.verbose)
     ]
 
+    if self.cfg.get('backup_dir') is not None:
+      callbacks.append(keras.callbacks.BackupAndRestore(self.cfg['backup_dir']))
+    
     keras_history = self.backend.fit(
       x = train[0],
       y = train[1],
-      batch_size = self._batch_size,
-      epochs = self._epochs,
-      verbose = self._verbosity_level,
+      batch_size = self.cfg['batch_size'],
+      epochs = self.cfg['epochs'],
+      verbose = self.cfg['verbosity'],
       callbacks = callbacks,
       validation_data = validation,
     )
@@ -284,7 +289,7 @@ class neural_network(model):
     return nn
   
   def _predict(self, x) -> np.ndarray:
-    return self.backend.predict(x, verbose = self._verbosity_level).flatten()
+    return self.backend.predict(x, verbose = self.cfg['verbosity']).flatten()
   
   def _save(self, path) -> None:
     self.backend.save(path/'model')
@@ -350,6 +355,7 @@ class multilayer_perceptron_regressor(neural_network):
     optimizer: str = 'adam',
     batch_size: int = 32,
     epochs: int = 1000,
+    backup_dir: str | os.PathLike | None = None,
     verbose: bool = True,
   ) -> None:
     
@@ -361,7 +367,7 @@ class multilayer_perceptron_regressor(neural_network):
 
     mlp.compile(optimizer = optimizer, loss = 'mse', jit_compile = True)
 
-    super().__init__(backend = mlp, batch_size = batch_size, epochs = epochs, verbose = verbose)
+    super().__init__(backend = mlp, batch_size = batch_size, epochs = epochs, backup_dir = backup_dir, verbose = verbose)
 
 class recurrent_network(neural_network):
   def __init__(
@@ -374,6 +380,7 @@ class recurrent_network(neural_network):
     optimizer: str = 'adam',
     batch_size: int = 32,
     epochs: int = 1000,
+    backup_dir: str | os.PathLike | None = None,
     verbose: bool = True,
   ) -> None:
     
@@ -388,7 +395,7 @@ class recurrent_network(neural_network):
 
     rnn.compile(optimizer = optimizer, loss = 'mse', jit_compile = True)
 
-    super().__init__(backend = rnn, batch_size = batch_size, epochs = epochs, verbose = verbose)
+    super().__init__(backend = rnn, batch_size = batch_size, epochs = epochs, backup_dir = backup_dir, verbose = verbose)
 
 class convolutional_network(neural_network):
   layer = collections.namedtuple('convolutional_network_layer', ('filters', 'kernel', 'pooling'))
@@ -402,6 +409,7 @@ class convolutional_network(neural_network):
     optimizer: str = 'adam',
     batch_size: int = 32,
     epochs: int = 1000,
+    backup_dir: str | os.PathLike | None = None,
     verbose: bool = True,
   ) -> None:
     
@@ -424,7 +432,7 @@ class convolutional_network(neural_network):
 
     cnn.compile(optimizer = optimizer, loss = 'mse', jit_compile = True)
 
-    super().__init__(backend = cnn, batch_size = batch_size, epochs = epochs, verbose = verbose)
+    super().__init__(backend = cnn, batch_size = batch_size, epochs = epochs, backup_dir = backup_dir, verbose = verbose)
 
 # *
 # * model loader
