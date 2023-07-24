@@ -33,6 +33,9 @@ def main(
   for cut in cuts:
     xfirst.util.echo(verbose, f'\nprocessing cut configuration {cut.name}')
 
+    savepath = None if save is None else cut.path(f'{save}/mlp-fit-' + '-'.join(map(str, layers)))
+    backuppath = None if save is None else savepath/'backup'
+
     # load normalized data. drop bad fits on train and validation sets
     data = xfirst.data.load_fits(
       datadir  = datadir,
@@ -50,6 +53,7 @@ def main(
     model = xfirst.models.multilayer_perceptron_regressor(
       input = len(x),
       layers = layers,
+      backup_dir = backuppath,
       verbose = verbose,
     ).fit(data, x, y)
 
@@ -57,7 +61,7 @@ def main(
     if save is not None:
       model.eval(
         data = data,
-        save = cut.path(f'{save}/mlp-fit-' + '-'.join(map(str, layers))),
+        save = savepath,
         plot = True
       )
 

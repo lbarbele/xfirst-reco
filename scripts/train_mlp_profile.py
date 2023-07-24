@@ -28,6 +28,8 @@ def main(
   
   layers = [int(i) for i in re.sub(',|-|\.|\/', ':', layers).split(':')]
   cut = xfirst.config.cut.get(cut)
+  savepath = None if save is None else cut.path(f'{save}/mlp-' + ('both-' if fits else 'profile-') + '-'.join(map(str, layers)))
+  backuppath = None if save is None else savepath/'backup'
 
   x_prof = xfirst.data.load_depths(datadir, cut).index.to_list()
   x_fits = xfirst.profile_functions.usp().parameter_names if (fits is True) else []
@@ -53,12 +55,13 @@ def main(
     layers = layers,
     verbose = verbose,
     batch_size = batch_size,
+    backup_dir = backuppath,
   ).fit(data, x, y)
 
   if save is not None:
     model.eval(
       data = data,
-      save = cut.path(f'{save}/mlp-' + ('both-' if fits else 'profile-') + '-'.join(map(str, layers))),
+      save = savepath,
       plot = True
     )
 
