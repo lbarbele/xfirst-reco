@@ -241,7 +241,7 @@ def load_fits(
       fits[d] = fits[d].sample(frac = 1)
 
   if norm is not None:
-    util.echo(True, f'+ normalizing columns {norm}')
+    util.echo(verbose, f'+ normalizing columns {norm}')
     fits = normalize(fits, norm)
 
   return util.collapse(fits)
