@@ -1,0 +1,11 @@
+{
+  "batch_size": 32,
+  "features": [
+    "lgNmax",
+    "Xmax",
+    "L",
+    "R"
+  ],
+  "target": "Xfirst",
+  "name": "multilayer_perceptron_regressor"
+}
