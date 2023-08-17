@@ -244,7 +244,7 @@ class neural_network(model):
       'batch_size': batch_size,
       'epochs': epochs,
       'verbosity': verbose * (2 - util.interactive()),
-      'backup_dir': backup_dir,
+      'backup_dir': str(backup_dir),
     }
 
     super().__init__(backend = backend, cfg = cfg, verbose = verbose)
