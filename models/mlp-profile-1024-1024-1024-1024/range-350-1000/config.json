@@ -68,5 +68,6 @@
     "Edep_99"
   ],
   "target": "Xfirst",
-  "name": "multilayer_perceptron_regressor"
+  "name": "neural_network",
+  "verbosity": true
 }
